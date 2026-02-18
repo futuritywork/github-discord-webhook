@@ -4,8 +4,9 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "bun run index.ts --hot",
-		"start": "bun run index.ts",
+		"build:frontend": "bun run build.ts",
+		"dev": "bun run build:frontend && bun run index.ts --hot",
+		"start": "bun run build:frontend && bun run index.ts",
 		"lint": "biome check . --write",
 		"typecheck": "tsgo --noEmit"
 	},
@@ -21,10 +22,14 @@
 	},
 	"dependencies": {
 		"@t3-oss/env-core": "^0.13.10",
+		"@types/react": "^19.2.14",
+		"@types/react-dom": "^19.2.3",
 		"drizzle-orm": "^0.45.1",
 		"hono": "^4.11.3",
 		"pino": "^10.3.0",
 		"postgres": "^3.4.7",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4",
 		"zod": "^4.2.1"
 	}
 }

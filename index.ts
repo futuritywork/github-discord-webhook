@@ -19,13 +19,13 @@ app.get("/health", (c) => {
 	return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Mount feature-based routes
-app.route("/", staticApp);
+// Mount feature-based routes (API routes before static catch-all)
 app.route("/auth", authApp);
 app.route("/webhook", githubWebhookApp);
 app.route("/webhooks", webhookMappingApp);
 app.route("/ping-settings", pingSettingsApp);
 app.route("/webhooks", testWebhookApp);
+app.route("/", staticApp);
 
 // Global error handler
 app.onError((err, c) => {
