@@ -295,6 +295,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 	let action: string;
 	let eventKey: EventKey | undefined;
 	let pingGithubUsername: string | undefined;
+	const githubUsernames = new Set<string>();
 
 	if (eventType === "pull_request") {
 		const {
@@ -311,6 +312,16 @@ githubWebhookApp.post("/github/:id", async (c) => {
 		}
 
 		action = parsedBody.action;
+
+		if ("pull_request" in parsedBody && parsedBody.pull_request) {
+			githubUsernames.add(parsedBody.pull_request.user.login);
+			if (
+				"merged_by" in parsedBody.pull_request &&
+				parsedBody.pull_request.merged_by
+			) {
+				githubUsernames.add(parsedBody.pull_request.merged_by.login);
+			}
+		}
 
 		switch (parsedBody.action) {
 			case "opened":
@@ -359,6 +370,8 @@ githubWebhookApp.post("/github/:id", async (c) => {
 		}
 
 		action = parsedBody.action;
+		githubUsernames.add(parsedBody.pull_request.user.login);
+		githubUsernames.add(parsedBody.review.user.login);
 
 		switch (parsedBody.action) {
 			case "submitted": {
@@ -402,6 +415,8 @@ githubWebhookApp.post("/github/:id", async (c) => {
 		}
 
 		action = parsedBody.action;
+		githubUsernames.add(parsedBody.pull_request.user.login);
+		githubUsernames.add(parsedBody.comment.user.login);
 
 		switch (parsedBody.action) {
 			case "created": {
@@ -416,6 +431,13 @@ githubWebhookApp.post("/github/:id", async (c) => {
 			ignored: true,
 			reason: `Event type '${eventType}' not handled`,
 		});
+	}
+
+	if (githubUsernames.size > 0) {
+		logger.info(
+			{ eventType, repo, githubUsernames: [...githubUsernames] },
+			"GitHub usernames in webhook payload",
+		);
 	}
 
 	// Resolve ping content if applicable
