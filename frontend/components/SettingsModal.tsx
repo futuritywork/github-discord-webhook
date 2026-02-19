@@ -4,6 +4,110 @@ import { orpc } from "../client";
 import type { EventKey, ReviewerPing } from "../types";
 import { EVENT_LABELS } from "../types";
 
+function DiscordUserCombobox({
+	value,
+	onChange,
+	suggestions,
+}: {
+	value: string;
+	onChange: (val: string) => void;
+	suggestions: { discordUserId: string; githubUsername: string }[];
+}) {
+	const [open, setOpen] = useState(false);
+	const [highlightIndex, setHighlightIndex] = useState(-1);
+	const ref = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	const filtered = value
+		? suggestions.filter(
+				(s) =>
+					s.discordUserId.includes(value) ||
+					s.githubUsername.toLowerCase().includes(value.toLowerCase()),
+			)
+		: suggestions;
+
+	useEffect(() => {
+		function handleClickOutside(e: MouseEvent) {
+			if (ref.current && !ref.current.contains(e.target as Node)) {
+				setOpen(false);
+			}
+		}
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, []);
+
+	const select = (discordUserId: string) => {
+		onChange(discordUserId);
+		setOpen(false);
+		inputRef.current?.focus();
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (!open || filtered.length === 0) return;
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			setHighlightIndex((i) => (i + 1) % filtered.length);
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			setHighlightIndex((i) => (i - 1 + filtered.length) % filtered.length);
+		} else if (
+			e.key === "Enter" &&
+			highlightIndex >= 0 &&
+			filtered[highlightIndex]
+		) {
+			e.preventDefault();
+			select(filtered[highlightIndex].discordUserId);
+		} else if (e.key === "Escape") {
+			e.stopPropagation();
+			setOpen(false);
+		}
+	};
+
+	return (
+		<div ref={ref} className="relative">
+			<input
+				ref={inputRef}
+				type="text"
+				placeholder="Discord user ID"
+				data-1p-ignore
+				autoComplete="off"
+				value={value}
+				onChange={(e) => {
+					onChange(e.target.value);
+					setHighlightIndex(-1);
+					setOpen(true);
+				}}
+				onFocus={() => setOpen(true)}
+				onKeyDown={handleKeyDown}
+				className="w-full rounded-lg border-0 bg-zinc-800 py-2 px-3 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-violet-500 text-sm"
+			/>
+			{open && filtered.length > 0 && (
+				<div className="absolute z-10 mt-1 w-full max-h-40 overflow-y-auto rounded-lg bg-zinc-800 border border-zinc-700 shadow-xl">
+					{filtered.map((item, i) => (
+						<button
+							key={item.discordUserId}
+							type="button"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								select(item.discordUserId);
+							}}
+							onMouseEnter={() => setHighlightIndex(i)}
+							className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+								i === highlightIndex
+									? "bg-violet-500/20 text-violet-300"
+									: "text-zinc-300 hover:bg-zinc-700"
+							}`}
+						>
+							<span className="font-mono">{item.discordUserId}</span>
+							<span className="text-zinc-500"> - {item.githubUsername}</span>
+						</button>
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
 function UsernameCombobox({
 	value,
 	onChange,
@@ -594,14 +698,13 @@ export function SettingsModal({
 								<label className="text-xs text-zinc-400 mb-1 block">
 									Discord User ID
 								</label>
-								<input
-									type="text"
-									placeholder="Discord user ID"
-									data-1p-ignore
-									autoComplete="off"
+								<DiscordUserCombobox
 									value={reviewerDiscord}
-									onChange={(e) => setReviewerDiscord(e.target.value)}
-									className="w-full rounded-lg border-0 bg-zinc-800 py-2 px-3 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-violet-500 text-sm"
+									onChange={setReviewerDiscord}
+									suggestions={users.map((u) => ({
+										discordUserId: u.discordUserId,
+										githubUsername: u.githubUsername,
+									}))}
 								/>
 							</div>
 							<div>
