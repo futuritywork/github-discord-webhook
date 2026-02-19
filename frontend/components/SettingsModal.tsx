@@ -65,6 +65,8 @@ function UsernameCombobox({
 				ref={inputRef}
 				type="text"
 				placeholder="GitHub username"
+				data-1p-ignore
+				autoComplete="off"
 				value={value}
 				onChange={(e) => {
 					onChange(e.target.value);
@@ -338,6 +340,8 @@ export function SettingsModal({
 						<input
 							type="text"
 							placeholder="Discord user ID"
+							data-1p-ignore
+							autoComplete="off"
 							value={newDiscord}
 							onChange={(e) => setNewDiscord(e.target.value)}
 							className="flex-1 rounded-lg border-0 bg-zinc-800 py-2 px-3 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-violet-500 text-sm"
