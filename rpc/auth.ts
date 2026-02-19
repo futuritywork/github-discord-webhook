@@ -116,7 +116,7 @@ export const me = authed.handler(async ({ context }) => {
 	return {
 		id: user.id,
 		username: user.username,
-		createdAt: user.createdAt.toISOString(),
+		createdAt: user.createdAt,
 	};
 });
 
@@ -140,9 +140,9 @@ export const listInvites = authed.handler(async ({ context }) => {
 	return {
 		invites: invites.map((inv) => ({
 			code: inv.code,
-			createdAt: inv.createdAt.toISOString(),
+			createdAt: inv.createdAt,
 			used: inv.usedBy !== null,
-			usedAt: inv.usedAt?.toISOString() ?? null,
+			usedAt: inv.usedAt ?? null,
 		})),
 	};
 });

@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { orpc } from "../client";
 
-function formatDate(dateStr: string): string {
-	const date = new Date(dateStr);
+function formatDate(date: Date): string {
 	const now = new Date();
 	const diffMs = now.getTime() - date.getTime();
 	const diffMins = Math.floor(diffMs / 60000);

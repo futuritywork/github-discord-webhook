@@ -1,23 +1,12 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
-import { EVENT_KEYS, type EventKey, type GitHubDiscordUser } from "../adapters";
+import { EVENT_KEYS, type EventKey } from "../adapters";
 import {
 	githubDiscordUserAdapter,
 	pingSettingsAdapter,
 	webhookAdapter,
 } from "../lib/adapters";
 import { authed } from "./base";
-
-function serializeDiscordUser(u: GitHubDiscordUser) {
-	return {
-		id: u.id,
-		webhookMappingId: u.webhookMappingId,
-		githubUsername: u.githubUsername,
-		discordUserId: u.discordUserId,
-		userId: u.userId,
-		createdAt: u.createdAt.toISOString(),
-	};
-}
 
 async function requireMappingOwnership(userId: string, mappingId: string) {
 	const mapping = await webhookAdapter.getById(mappingId);
@@ -74,7 +63,7 @@ export const listDiscordUsers = authed
 		const users = await githubDiscordUserAdapter.listByWebhookMapping(
 			input.mappingId,
 		);
-		return users.map(serializeDiscordUser);
+		return users;
 	});
 
 export const addDiscordUser = authed
@@ -103,7 +92,7 @@ export const addDiscordUser = authed
 			input.githubUsername,
 			input.discordUserId,
 		);
-		return serializeDiscordUser(created);
+		return created;
 	});
 
 export const deleteDiscordUser = authed
