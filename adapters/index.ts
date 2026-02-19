@@ -18,6 +18,11 @@ export {
 	PingSettingsAdapter,
 } from "./ping-settings";
 export {
+	DatabaseReviewerPingAdapter,
+	type ReviewerPing,
+	ReviewerPingAdapter,
+} from "./reviewer-pings";
+export {
 	DatabaseSeenGithubUsernamesAdapter,
 	type SeenGithubUsername,
 	SeenGithubUsernamesAdapter,

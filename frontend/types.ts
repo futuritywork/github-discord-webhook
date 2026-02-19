@@ -16,6 +16,8 @@ export type GitHubDiscordUser =
 	Outputs["pingSettings"]["listDiscordUsers"][number];
 export type Invite = Outputs["auth"]["listInvites"]["invites"][number];
 
+export type ReviewerPing = Outputs["reviewerPings"]["list"][number];
+
 export type EventKey = keyof PingSettings;
 
 export interface DiscordEmbed {

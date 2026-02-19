@@ -3,6 +3,7 @@ import type { EventKey } from "../adapters";
 import {
 	githubDiscordUserAdapter,
 	pingSettingsAdapter,
+	reviewerPingAdapter,
 	seenGithubUsernamesAdapter,
 } from "../lib/adapters";
 import { colors } from "../lib/colors";
@@ -299,6 +300,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 	let action: string;
 	let eventKey: EventKey | undefined;
 	let pingGithubUsername: string | undefined;
+	let eventActorUsername: string | undefined;
 	const githubUsernames = new Set<string>();
 
 	if (eventType === "pull_request") {
@@ -332,21 +334,29 @@ githubWebhookApp.post("/github/:id", async (c) => {
 				embed = handleOpened(parsedBody);
 				eventKey = "pr_opened";
 				pingGithubUsername = parsedBody.pull_request.user.login;
+				eventActorUsername = parsedBody.pull_request.user.login;
 				break;
 			case "closed":
 				embed = handleClosed(parsedBody);
 				eventKey = parsedBody.pull_request.merged ? "pr_merged" : "pr_closed";
 				pingGithubUsername = parsedBody.pull_request.user.login;
+				eventActorUsername =
+					parsedBody.pull_request.merged &&
+					parsedBody.pull_request.merged_by?.login
+						? parsedBody.pull_request.merged_by.login
+						: parsedBody.pull_request.user.login;
 				break;
 			case "converted_to_draft":
 				embed = handleConvertedToDraft(parsedBody);
 				eventKey = "pr_converted_to_draft";
 				pingGithubUsername = parsedBody.pull_request.user.login;
+				eventActorUsername = parsedBody.pull_request.user.login;
 				break;
 			case "ready_for_review":
 				embed = handleReadyForReview(parsedBody);
 				eventKey = "pr_ready_for_review";
 				pingGithubUsername = parsedBody.pull_request.user.login;
+				eventActorUsername = parsedBody.pull_request.user.login;
 				break;
 			case "synchronize":
 				return c.json({
@@ -401,6 +411,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 					eventKey = "review_commented";
 				}
 				pingGithubUsername = parsedBody.pull_request.user.login;
+				eventActorUsername = parsedBody.review.user.login;
 				break;
 			}
 		}
@@ -427,6 +438,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 				embed = handleReviewCommentCreated(parsedBody);
 				eventKey = "review_commented";
 				pingGithubUsername = parsedBody.pull_request.user.login;
+				eventActorUsername = parsedBody.comment.user.login;
 				break;
 			}
 		}
@@ -451,8 +463,15 @@ githubWebhookApp.post("/github/:id", async (c) => {
 	}
 
 	// Resolve ping content if applicable
-	let pingContent: string | undefined;
-	if (eventKey && pingGithubUsername) {
+	const pingMentions = new Set<string>();
+
+	// Author pings: ping the PR author's Discord user
+	// Skip if the actor is the same person (e.g. author merges their own PR)
+	if (
+		eventKey &&
+		pingGithubUsername &&
+		pingGithubUsername !== eventActorUsername
+	) {
 		try {
 			const settings =
 				await pingSettingsAdapter.getForMapping(webhookMappingId);
@@ -462,16 +481,39 @@ githubWebhookApp.post("/github/:id", async (c) => {
 					pingGithubUsername,
 				);
 				if (userMapping) {
-					pingContent = `<@${userMapping.discordUserId}>`;
+					pingMentions.add(`<@${userMapping.discordUserId}>`);
 				}
 			}
 		} catch (err) {
 			logger.error(
 				{ err, eventKey, pingGithubUsername, repo },
-				"Failed to resolve ping",
+				"Failed to resolve author ping",
 			);
 		}
 	}
+
+	// Reviewer pings: ping watchers who opted in for this actor + event
+	if (eventKey && eventActorUsername) {
+		try {
+			const reviewerDiscordIds =
+				await reviewerPingAdapter.findMatchingReviewers(
+					webhookMappingId,
+					eventKey,
+					eventActorUsername,
+				);
+			for (const discordId of reviewerDiscordIds) {
+				pingMentions.add(`<@${discordId}>`);
+			}
+		} catch (err) {
+			logger.error(
+				{ err, eventKey, eventActorUsername, repo },
+				"Failed to resolve reviewer pings",
+			);
+		}
+	}
+
+	const pingContent =
+		pingMentions.size > 0 ? [...pingMentions].join(" ") : undefined;
 
 	const result = await sendDiscordEmbed(webhookUrl, embed, pingContent);
 

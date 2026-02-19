@@ -1,6 +1,7 @@
 import * as auth from "./auth";
 import { base } from "./base";
 import * as pingSettings from "./ping-settings";
+import * as reviewerPings from "./reviewer-pings";
 import * as webhooks from "./webhooks";
 
 export const router = base.router({
@@ -31,6 +32,12 @@ export const router = base.router({
 		addDiscordUser: pingSettings.addDiscordUser,
 		listSeenUsernames: pingSettings.listSeenUsernames,
 		deleteDiscordUser: pingSettings.deleteDiscordUser,
+	},
+	reviewerPings: {
+		list: reviewerPings.list,
+		create: reviewerPings.create,
+		update: reviewerPings.update,
+		delete: reviewerPings.del,
 	},
 });
 

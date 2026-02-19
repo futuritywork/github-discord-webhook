@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { orpc } from "../client";
-import type { EventKey } from "../types";
+import type { EventKey, ReviewerPing } from "../types";
 import { EVENT_LABELS } from "../types";
 
 function UsernameCombobox({
@@ -117,6 +117,14 @@ export function SettingsModal({
 	const [userError, setUserError] = useState("");
 	const [newGithub, setNewGithub] = useState("");
 	const [newDiscord, setNewDiscord] = useState("");
+	const [reviewerError, setReviewerError] = useState("");
+	const [showReviewerForm, setShowReviewerForm] = useState(false);
+	const [editingReviewer, setEditingReviewer] = useState<ReviewerPing | null>(
+		null,
+	);
+	const [reviewerDiscord, setReviewerDiscord] = useState("");
+	const [reviewerUsernames, setReviewerUsernames] = useState<string[]>([]);
+	const [reviewerEvents, setReviewerEvents] = useState<EventKey[]>([]);
 
 	useEffect(() => {
 		const handleEsc = (e: KeyboardEvent) => {
@@ -138,9 +146,14 @@ export function SettingsModal({
 		}),
 	);
 
+	const reviewerPingsQuery = useQuery(
+		orpc.reviewerPings.list.queryOptions({ input: { mappingId } }),
+	);
+
 	const settings = settingsQuery.data;
 	const users = usersQuery.data ?? [];
 	const seenUsernames = seenQuery.data ?? [];
+	const reviewerPings = reviewerPingsQuery.data ?? [];
 
 	// Filter out usernames that already have a mapping
 	const mappedUsernames = new Set(users.map((u) => u.githubUsername));
@@ -194,6 +207,104 @@ export function SettingsModal({
 			},
 		}),
 	);
+
+	const invalidateReviewerPings = () => {
+		queryClient.invalidateQueries({
+			queryKey: orpc.reviewerPings.list.key({ input: { mappingId } }),
+		});
+	};
+
+	const createReviewerMutation = useMutation(
+		orpc.reviewerPings.create.mutationOptions({
+			onSuccess: () => {
+				resetReviewerForm();
+				invalidateReviewerPings();
+			},
+			onError: (err) => setReviewerError(err.message),
+		}),
+	);
+
+	const updateReviewerMutation = useMutation(
+		orpc.reviewerPings.update.mutationOptions({
+			onSuccess: () => {
+				resetReviewerForm();
+				invalidateReviewerPings();
+			},
+			onError: (err) => setReviewerError(err.message),
+		}),
+	);
+
+	const deleteReviewerMutation = useMutation(
+		orpc.reviewerPings.delete.mutationOptions({
+			onSuccess: invalidateReviewerPings,
+			onError: (err) => alert(err.message),
+		}),
+	);
+
+	const resetReviewerForm = () => {
+		setShowReviewerForm(false);
+		setEditingReviewer(null);
+		setReviewerDiscord("");
+		setReviewerUsernames([]);
+		setReviewerEvents([]);
+		setReviewerError("");
+	};
+
+	const startEditReviewer = (rp: ReviewerPing) => {
+		setEditingReviewer(rp);
+		setReviewerDiscord(rp.discordUserId);
+		setReviewerUsernames([...rp.watchedGithubUsernames]);
+		setReviewerEvents([...rp.watchedEventKeys] as EventKey[]);
+		setShowReviewerForm(true);
+		setReviewerError("");
+	};
+
+	const saveReviewer = () => {
+		setReviewerError("");
+		const discordUserId = reviewerDiscord.trim();
+		if (!discordUserId) {
+			setReviewerError("Discord user ID is required");
+			return;
+		}
+		if (reviewerUsernames.length === 0) {
+			setReviewerError("Select at least one GitHub username");
+			return;
+		}
+		if (reviewerEvents.length === 0) {
+			setReviewerError("Select at least one event");
+			return;
+		}
+		if (editingReviewer) {
+			updateReviewerMutation.mutate({
+				mappingId,
+				id: editingReviewer.id,
+				discordUserId,
+				watchedGithubUsernames: reviewerUsernames,
+				watchedEventKeys: reviewerEvents,
+			});
+		} else {
+			createReviewerMutation.mutate({
+				mappingId,
+				discordUserId,
+				watchedGithubUsernames: reviewerUsernames,
+				watchedEventKeys: reviewerEvents,
+			});
+		}
+	};
+
+	const toggleReviewerUsername = (username: string) => {
+		setReviewerUsernames((prev) =>
+			prev.includes(username)
+				? prev.filter((u) => u !== username)
+				: [...prev, username],
+		);
+	};
+
+	const toggleReviewerEvent = (key: EventKey) => {
+		setReviewerEvents((prev) =>
+			prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+		);
+	};
 
 	const toggleSetting = (key: EventKey, enabled: boolean) => {
 		setPingError("");
@@ -357,6 +468,212 @@ export function SettingsModal({
 					{userError && (
 						<div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mt-2">
 							{userError}
+						</div>
+					)}
+				</div>
+
+				{/* Reviewer Pings */}
+				<div className="border-t border-zinc-800 pt-4 mt-4">
+					<div className="flex items-center justify-between mb-3">
+						<div>
+							<h4 className="text-sm font-medium text-zinc-300">
+								Reviewer Pings
+							</h4>
+							<p className="text-xs text-zinc-500 mt-0.5">
+								Get pinged when specific GitHub users trigger events
+							</p>
+						</div>
+						{!showReviewerForm && (
+							<button
+								type="button"
+								onClick={() => {
+									resetReviewerForm();
+									setShowReviewerForm(true);
+								}}
+								className="px-3 py-1.5 rounded-lg text-xs font-medium text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 transition-colors border border-violet-500/20"
+							>
+								Add
+							</button>
+						)}
+					</div>
+
+					{/* Existing reviewer ping configs */}
+					<div className="space-y-2 mb-3">
+						{reviewerPings.length === 0 && !showReviewerForm && (
+							<div className="text-xs text-zinc-500 py-2">
+								No reviewer pings configured.
+							</div>
+						)}
+						{reviewerPings.map((rp) => (
+							<div
+								key={rp.id}
+								className="px-3 py-2.5 rounded-lg bg-zinc-800/50 space-y-1.5"
+							>
+								<div className="flex items-center justify-between">
+									<span className="text-sm text-violet-400 font-mono">
+										{rp.discordUserId}
+									</span>
+									<div className="flex gap-1">
+										<button
+											type="button"
+											onClick={() => startEditReviewer(rp)}
+											className="p-1 text-zinc-500 hover:text-zinc-300 rounded transition-colors"
+											title="Edit"
+										>
+											<svg
+												aria-hidden="true"
+												className="h-3.5 w-3.5"
+												fill="none"
+												viewBox="0 0 24 24"
+												strokeWidth="2"
+												stroke="currentColor"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"
+												/>
+											</svg>
+										</button>
+										<button
+											type="button"
+											onClick={() =>
+												deleteReviewerMutation.mutate({
+													mappingId,
+													id: rp.id,
+												})
+											}
+											className="p-1 text-zinc-500 hover:text-red-400 rounded transition-colors"
+											title="Remove"
+										>
+											<svg
+												aria-hidden="true"
+												className="h-3.5 w-3.5"
+												fill="none"
+												viewBox="0 0 24 24"
+												strokeWidth="2"
+												stroke="currentColor"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													d="M6 18L18 6M6 6l12 12"
+												/>
+											</svg>
+										</button>
+									</div>
+								</div>
+								<div className="flex flex-wrap gap-1">
+									{rp.watchedGithubUsernames.map((u) => (
+										<span
+											key={u}
+											className="text-xs bg-zinc-700/50 text-zinc-300 px-1.5 py-0.5 rounded"
+										>
+											{u}
+										</span>
+									))}
+								</div>
+								<div className="flex flex-wrap gap-1">
+									{rp.watchedEventKeys.map((k) => (
+										<span
+											key={k}
+											className="text-xs bg-violet-500/10 text-violet-400 px-1.5 py-0.5 rounded"
+										>
+											{EVENT_LABELS[k as EventKey] ?? k}
+										</span>
+									))}
+								</div>
+							</div>
+						))}
+					</div>
+
+					{/* Add/Edit form */}
+					{showReviewerForm && (
+						<div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 space-y-3">
+							<div>
+								<label className="text-xs text-zinc-400 mb-1 block">
+									Discord User ID
+								</label>
+								<input
+									type="text"
+									placeholder="Discord user ID"
+									data-1p-ignore
+									autoComplete="off"
+									value={reviewerDiscord}
+									onChange={(e) => setReviewerDiscord(e.target.value)}
+									className="w-full rounded-lg border-0 bg-zinc-800 py-2 px-3 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-violet-500 text-sm"
+								/>
+							</div>
+							<div>
+								<label className="text-xs text-zinc-400 mb-1 block">
+									Watched GitHub Usernames
+								</label>
+								<div className="flex flex-wrap gap-1.5">
+									{seenUsernames.map((username) => (
+										<button
+											key={username}
+											type="button"
+											onClick={() => toggleReviewerUsername(username)}
+											className={`text-xs px-2 py-1 rounded transition-colors ${
+												reviewerUsernames.includes(username)
+													? "bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40"
+													: "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700"
+											}`}
+										>
+											{username}
+										</button>
+									))}
+									{seenUsernames.length === 0 && (
+										<span className="text-xs text-zinc-500">
+											No GitHub usernames seen yet
+										</span>
+									)}
+								</div>
+							</div>
+							<div>
+								<label className="text-xs text-zinc-400 mb-1 block">
+									Watched Events
+								</label>
+								<div className="flex flex-wrap gap-1.5">
+									{(Object.entries(EVENT_LABELS) as [EventKey, string][]).map(
+										([key, label]) => (
+											<button
+												key={key}
+												type="button"
+												onClick={() => toggleReviewerEvent(key)}
+												className={`text-xs px-2 py-1 rounded transition-colors ${
+													reviewerEvents.includes(key)
+														? "bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/40"
+														: "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700"
+												}`}
+											>
+												{label}
+											</button>
+										),
+									)}
+								</div>
+							</div>
+							{reviewerError && (
+								<div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+									{reviewerError}
+								</div>
+							)}
+							<div className="flex gap-2 justify-end">
+								<button
+									type="button"
+									onClick={resetReviewerForm}
+									className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-300 transition-colors"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={saveReviewer}
+									className="px-3 py-1.5 rounded-lg text-xs font-medium text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 transition-colors border border-violet-500/20"
+								>
+									{editingReviewer ? "Update" : "Save"}
+								</button>
+							</div>
 						</div>
 					)}
 				</div>

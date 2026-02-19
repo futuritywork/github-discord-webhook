@@ -79,6 +79,30 @@ export const seenGithubUsernames = pgTable(
 	(t) => [unique().on(t.webhookMappingId, t.githubUsername)],
 );
 
+export const reviewerPings = pgTable(
+	"reviewer_pings",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		webhookMappingId: uuid("webhook_mapping_id")
+			.notNull()
+			.references(() => webhookMappings.id, { onDelete: "cascade" }),
+		discordUserId: varchar("discord_user_id", { length: 255 }).notNull(),
+		watchedGithubUsernames: varchar("watched_github_usernames", {
+			length: 255,
+		})
+			.array()
+			.notNull(),
+		watchedEventKeys: varchar("watched_event_keys", { length: 100 })
+			.array()
+			.notNull(),
+		userId: uuid("user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		createdAt: timestamp("created_at").notNull().defaultNow(),
+	},
+	(t) => [unique().on(t.webhookMappingId, t.discordUserId)],
+);
+
 export const pingSettings = pgTable(
 	"ping_settings",
 	{
