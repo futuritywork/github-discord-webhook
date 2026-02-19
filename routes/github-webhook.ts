@@ -56,7 +56,7 @@ function handleOpened(payload: OpenPayload): DiscordEmbed {
 		timestamp: new Date().toISOString(),
 		author: {
 			name: pr.user.login,
-			url: pr.user.url,
+			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
 		fields: [
@@ -80,7 +80,7 @@ function handleClosed(payload: ClosedPayload): DiscordEmbed {
 		description: pr?.body ? filterBody(pr.body) : "No description",
 		author: {
 			name: pr.user.login,
-			url: pr.user.url,
+			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
 		url: pr?.html_url,
@@ -127,7 +127,7 @@ function handleConvertedToDraft(
 		timestamp: new Date().toISOString(),
 		author: {
 			name: pr.user.login,
-			url: pr.user.url,
+			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
 		fields: [
@@ -154,7 +154,7 @@ function handleReadyForReview(payload: ReadyForReviewPayload): DiscordEmbed {
 		timestamp: new Date().toISOString(),
 		author: {
 			name: pr.user.login,
-			url: pr.user.url,
+			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
 		fields: [
@@ -194,7 +194,7 @@ function handleReviewSubmitted(payload: ReviewSubmittedPayload): DiscordEmbed {
 		timestamp: review.submitted_at.toISOString(),
 		author: {
 			name: review.user.login,
-			url: review.user.url,
+			url: review.user.html_url,
 			icon_url: review.user.avatar_url,
 		},
 		fields: [
@@ -244,7 +244,7 @@ function handleReviewCommentCreated(
 		timestamp: comment.created_at.toISOString(),
 		author: {
 			name: comment.user.login,
-			url: comment.user.url,
+			url: comment.user.html_url,
 			icon_url: comment.user.avatar_url,
 		},
 		fields: [
