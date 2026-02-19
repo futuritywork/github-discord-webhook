@@ -29,6 +29,7 @@ export const router = base.router({
 		update: pingSettings.update,
 		listDiscordUsers: pingSettings.listDiscordUsers,
 		addDiscordUser: pingSettings.addDiscordUser,
+		listSeenUsernames: pingSettings.listSeenUsernames,
 		deleteDiscordUser: pingSettings.deleteDiscordUser,
 	},
 });

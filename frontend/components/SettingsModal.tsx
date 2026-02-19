@@ -1,8 +1,105 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { orpc } from "../client";
 import type { EventKey } from "../types";
 import { EVENT_LABELS } from "../types";
+
+function UsernameCombobox({
+	value,
+	onChange,
+	suggestions,
+}: {
+	value: string;
+	onChange: (val: string) => void;
+	suggestions: string[];
+}) {
+	const [open, setOpen] = useState(false);
+	const [highlightIndex, setHighlightIndex] = useState(-1);
+	const ref = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	const filtered = value
+		? suggestions.filter((s) => s.toLowerCase().includes(value.toLowerCase()))
+		: suggestions;
+
+	useEffect(() => {
+		function handleClickOutside(e: MouseEvent) {
+			if (ref.current && !ref.current.contains(e.target as Node)) {
+				setOpen(false);
+			}
+		}
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => document.removeEventListener("mousedown", handleClickOutside);
+	}, []);
+
+	const select = (username: string) => {
+		onChange(username);
+		setOpen(false);
+		inputRef.current?.focus();
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (!open || filtered.length === 0) return;
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			setHighlightIndex((i) => (i + 1) % filtered.length);
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			setHighlightIndex((i) => (i - 1 + filtered.length) % filtered.length);
+		} else if (
+			e.key === "Enter" &&
+			highlightIndex >= 0 &&
+			filtered[highlightIndex]
+		) {
+			e.preventDefault();
+			select(filtered[highlightIndex]);
+		} else if (e.key === "Escape") {
+			e.stopPropagation();
+			setOpen(false);
+		}
+	};
+
+	return (
+		<div ref={ref} className="relative flex-1">
+			<input
+				ref={inputRef}
+				type="text"
+				placeholder="GitHub username"
+				value={value}
+				onChange={(e) => {
+					onChange(e.target.value);
+					setHighlightIndex(-1);
+					setOpen(true);
+				}}
+				onFocus={() => setOpen(true)}
+				onKeyDown={handleKeyDown}
+				className="w-full rounded-lg border-0 bg-zinc-800 py-2 px-3 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-violet-500 text-sm"
+			/>
+			{open && filtered.length > 0 && (
+				<div className="absolute z-10 mt-1 w-full max-h-40 overflow-y-auto rounded-lg bg-zinc-800 border border-zinc-700 shadow-xl">
+					{filtered.map((username, i) => (
+						<button
+							key={username}
+							type="button"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								select(username);
+							}}
+							onMouseEnter={() => setHighlightIndex(i)}
+							className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+								i === highlightIndex
+									? "bg-violet-500/20 text-violet-300"
+									: "text-zinc-300 hover:bg-zinc-700"
+							}`}
+						>
+							{username}
+						</button>
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
 
 export function SettingsModal({
 	mappingId,
@@ -19,15 +116,35 @@ export function SettingsModal({
 	const [newGithub, setNewGithub] = useState("");
 	const [newDiscord, setNewDiscord] = useState("");
 
+	useEffect(() => {
+		const handleEsc = (e: KeyboardEvent) => {
+			if (e.key === "Escape") onClose();
+		};
+		document.addEventListener("keydown", handleEsc);
+		return () => document.removeEventListener("keydown", handleEsc);
+	}, [onClose]);
+
 	const settingsQuery = useQuery(
 		orpc.pingSettings.get.queryOptions({ input: { mappingId } }),
 	);
 	const usersQuery = useQuery(
 		orpc.pingSettings.listDiscordUsers.queryOptions({ input: { mappingId } }),
 	);
+	const seenQuery = useQuery(
+		orpc.pingSettings.listSeenUsernames.queryOptions({
+			input: { mappingId },
+		}),
+	);
 
 	const settings = settingsQuery.data;
 	const users = usersQuery.data ?? [];
+	const seenUsernames = seenQuery.data ?? [];
+
+	// Filter out usernames that already have a mapping
+	const mappedUsernames = new Set(users.map((u) => u.githubUsername));
+	const availableSuggestions = seenUsernames.filter(
+		(u) => !mappedUsernames.has(u),
+	);
 
 	const toggleMutation = useMutation(
 		orpc.pingSettings.update.mutationOptions({
@@ -213,12 +330,10 @@ export function SettingsModal({
 						)}
 					</div>
 					<div className="flex gap-2">
-						<input
-							type="text"
-							placeholder="GitHub username"
+						<UsernameCombobox
 							value={newGithub}
-							onChange={(e) => setNewGithub(e.target.value)}
-							className="flex-1 rounded-lg border-0 bg-zinc-800 py-2 px-3 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-violet-500 text-sm"
+							onChange={setNewGithub}
+							suggestions={availableSuggestions}
 						/>
 						<input
 							type="text"

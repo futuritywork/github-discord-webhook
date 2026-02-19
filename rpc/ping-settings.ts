@@ -4,6 +4,7 @@ import { EVENT_KEYS, type EventKey } from "../adapters";
 import {
 	githubDiscordUserAdapter,
 	pingSettingsAdapter,
+	seenGithubUsernamesAdapter,
 	webhookAdapter,
 } from "../lib/adapters";
 import { authed } from "./base";
@@ -93,6 +94,16 @@ export const addDiscordUser = authed
 			input.discordUserId,
 		);
 		return created;
+	});
+
+export const listSeenUsernames = authed
+	.input(z.object({ mappingId: z.string() }))
+	.handler(async ({ input, context }) => {
+		await requireMappingOwnership(context.userId, input.mappingId);
+		const seen = await seenGithubUsernamesAdapter.listByWebhookMapping(
+			input.mappingId,
+		);
+		return seen.map((s) => s.githubUsername);
 	});
 
 export const deleteDiscordUser = authed
