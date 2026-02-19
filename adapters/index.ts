@@ -18,6 +18,11 @@ export {
 	PingSettingsAdapter,
 } from "./ping-settings";
 export {
+	DatabaseSeenGithubUsernamesAdapter,
+	type SeenGithubUsername,
+	SeenGithubUsernamesAdapter,
+} from "./seen-github-usernames";
+export {
 	DatabaseSessionAdapter,
 	type Session,
 	SessionAdapter,

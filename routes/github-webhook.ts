@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import type { EventKey } from "../adapters";
-import { githubDiscordUserAdapter, pingSettingsAdapter } from "../lib/adapters";
+import {
+	githubDiscordUserAdapter,
+	pingSettingsAdapter,
+	seenGithubUsernamesAdapter,
+} from "../lib/adapters";
 import { colors } from "../lib/colors";
 import { type DiscordEmbed, sendDiscordEmbed } from "../lib/discord";
 import { filterBody } from "../lib/filterBody";
@@ -434,10 +438,16 @@ githubWebhookApp.post("/github/:id", async (c) => {
 	}
 
 	if (githubUsernames.size > 0) {
-		logger.info(
-			{ eventType, repo, githubUsernames: [...githubUsernames] },
-			"GitHub usernames in webhook payload",
-		);
+		try {
+			await seenGithubUsernamesAdapter.upsertMany(webhookMappingId, [
+				...githubUsernames,
+			]);
+		} catch (err) {
+			logger.error(
+				{ err, repo, githubUsernames: [...githubUsernames] },
+				"Failed to upsert seen GitHub usernames",
+			);
+		}
 	}
 
 	// Resolve ping content if applicable

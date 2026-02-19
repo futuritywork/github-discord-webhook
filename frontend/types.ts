@@ -1,109 +1,39 @@
-import { z } from "zod";
+import type { InferRouterOutputs } from "@orpc/server";
+import type { AppRouter } from "../rpc";
+
+type Outputs = InferRouterOutputs<AppRouter>;
 
 // =====================================================================
-// API Response Schemas
+// Types inferred from router
 // =====================================================================
 
-export const UserSchema = z.object({
-	id: z.string(),
-	username: z.string(),
-	createdAt: z.string(),
-});
-export type User = z.infer<typeof UserSchema>;
+export type User = Outputs["auth"]["me"];
+export type RegistrationMode = Outputs["auth"]["registrationMode"];
+export type WebhookMapping = Outputs["webhooks"]["list"][number];
+export type CreateMappingResponse = Outputs["webhooks"]["create"];
+export type PingSettings = Outputs["pingSettings"]["get"];
+export type GitHubDiscordUser =
+	Outputs["pingSettings"]["listDiscordUsers"][number];
+export type Invite = Outputs["auth"]["listInvites"]["invites"][number];
 
-export const RegistrationModeSchema = z.object({
-	mode: z.enum(["open", "invite_only", "closed"]),
-});
-export type RegistrationMode = z.infer<typeof RegistrationModeSchema>;
+export type EventKey = keyof PingSettings;
 
-export const LoginResponseSchema = z.object({
-	success: z.literal(true),
-	userId: z.string(),
-});
+export interface DiscordEmbed {
+	title?: string;
+	description?: string;
+	url?: string;
+	color?: number;
+	timestamp?: string;
+	author?: { name?: string; url?: string; icon_url?: string };
+	footer?: { text?: string; icon_url?: string };
+	image?: { url: string };
+	thumbnail?: { url: string };
+	fields?: { name: string; value: string; inline?: boolean }[];
+}
 
-export const RegisterResponseSchema = z.object({
-	userId: z.string(),
-	username: z.string(),
-});
-
-export const WebhookMappingSchema = z.object({
-	id: z.string(),
-	repo: z.string(),
-	discordWebhookUrl: z.string(),
-	githubWebhookUrl: z.string(),
-});
-export type WebhookMapping = z.infer<typeof WebhookMappingSchema>;
-
-export const WebhookMappingListSchema = z.array(WebhookMappingSchema);
-
-export const CreateMappingResponseSchema = z.object({
-	created: z.literal(true),
-	repo: z.string(),
-	id: z.string(),
-	githubWebhookUrl: z.string(),
-});
-export type CreateMappingResponse = z.infer<typeof CreateMappingResponseSchema>;
-
-export const EventKeySchema = z.enum([
-	"pr_opened",
-	"pr_closed",
-	"pr_merged",
-	"pr_converted_to_draft",
-	"pr_ready_for_review",
-	"review_approved",
-	"review_changes_requested",
-	"review_commented",
-]);
-export type EventKey = z.infer<typeof EventKeySchema>;
-
-export const PingSettingsSchema = z.record(EventKeySchema, z.boolean());
-export type PingSettings = z.infer<typeof PingSettingsSchema>;
-
-export const GitHubDiscordUserSchema = z.object({
-	id: z.string(),
-	webhookMappingId: z.string(),
-	githubUsername: z.string(),
-	discordUserId: z.string(),
-	userId: z.string().nullable(),
-	createdAt: z.string(),
-});
-export type GitHubDiscordUser = z.infer<typeof GitHubDiscordUserSchema>;
-
-export const GitHubDiscordUserListSchema = z.array(GitHubDiscordUserSchema);
-
-export const InviteSchema = z.object({
-	code: z.string(),
-	createdAt: z.string(),
-	used: z.boolean(),
-	usedAt: z.string().nullable(),
-});
-export type Invite = z.infer<typeof InviteSchema>;
-
-export const InvitesResponseSchema = z.object({
-	invites: z.array(InviteSchema),
-});
-
-export const CreateInviteResponseSchema = z.object({
-	code: z.string(),
-});
-
-export const ErrorResponseSchema = z.object({
-	error: z.string(),
-});
-
-export const TestWebhookResponseSchema = z.object({
-	sent: z.literal(true),
-	status: z.number(),
-});
-
-export const DeleteResponseSchema = z.object({
-	deleted: z.literal(true),
-});
-
-export const UpdateSecretResponseSchema = z.object({
-	updated: z.literal(true),
-	repo: z.string(),
-});
+// =====================================================================
+// UI Constants
+// =====================================================================
 
 export const EVENT_LABELS: Record<EventKey, string> = {
 	pr_opened: "PR Opened",

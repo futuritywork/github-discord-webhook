@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import * as api from "../api";
-import type { Invite } from "../types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { orpc } from "../client";
 
 function formatDate(dateStr: string): string {
 	const date = new Date(dateStr);
@@ -18,45 +17,39 @@ function formatDate(dateStr: string): string {
 }
 
 export function InviteSection() {
-	const [invites, setInvites] = useState<Invite[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [creating, setCreating] = useState(false);
+	const queryClient = useQueryClient();
+	const invitesQuery = useQuery(orpc.auth.listInvites.queryOptions());
+	const invites = invitesQuery.data?.invites ?? [];
 
-	const load = useCallback(async () => {
-		try {
-			const data = await api.getInvites();
-			setInvites(data.invites);
-		} catch {
-			// ignore
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+	const createMutation = useMutation(
+		orpc.auth.createInvite.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({
+					queryKey: orpc.auth.listInvites.key(),
+				});
+			},
+			onError: (err) => {
+				alert(err.message);
+			},
+		}),
+	);
 
-	useEffect(() => {
-		load();
-	}, [load]);
+	const revokeMutation = useMutation(
+		orpc.auth.revokeInvite.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({
+					queryKey: orpc.auth.listInvites.key(),
+				});
+			},
+			onError: (err) => {
+				alert(err.message);
+			},
+		}),
+	);
 
-	const handleCreate = async () => {
-		setCreating(true);
-		try {
-			await api.createInvite();
-			await load();
-		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to create invite");
-		} finally {
-			setCreating(false);
-		}
-	};
-
-	const handleRevoke = async (code: string) => {
+	const handleRevoke = (code: string) => {
 		if (!confirm(`Revoke invite code ${code}?`)) return;
-		try {
-			await api.revokeInvite(code);
-			await load();
-		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to revoke");
-		}
+		revokeMutation.mutate({ code });
 	};
 
 	const handleCopy = (code: string) => {
@@ -74,15 +67,15 @@ export function InviteSection() {
 				</div>
 				<button
 					type="button"
-					onClick={handleCreate}
-					disabled={creating}
+					onClick={() => createMutation.mutate(undefined)}
+					disabled={createMutation.isPending}
 					className="px-4 py-2 text-sm font-medium rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors border border-violet-500/20 disabled:opacity-50"
 				>
-					{creating ? "Creating..." : "+ Create Invite"}
+					{createMutation.isPending ? "Creating..." : "+ Create Invite"}
 				</button>
 			</div>
 			<div className="divide-y divide-zinc-800">
-				{loading ? (
+				{invitesQuery.isLoading ? (
 					<div className="px-6 py-8 text-center text-zinc-500">Loading...</div>
 				) : invites.length === 0 ? (
 					<div className="px-6 py-8 text-center text-zinc-500">

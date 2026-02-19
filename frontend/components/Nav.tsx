@@ -1,4 +1,5 @@
-import { logout } from "../api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { orpc } from "../client";
 import type { User } from "../types";
 
 export function Nav({
@@ -10,10 +11,15 @@ export function Nav({
 	currentPath: string;
 	navigate: (path: string) => void;
 }) {
-	const handleLogout = async () => {
-		await logout();
-		navigate("/");
-	};
+	const queryClient = useQueryClient();
+	const logoutMutation = useMutation(
+		orpc.auth.logout.mutationOptions({
+			onSuccess: () => {
+				queryClient.clear();
+				navigate("/");
+			},
+		}),
+	);
 
 	return (
 		<nav className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-50">
@@ -61,7 +67,7 @@ export function Nav({
 						<span className="text-sm text-zinc-400">{user.username}</span>
 						<button
 							type="button"
-							onClick={handleLogout}
+							onClick={() => logoutMutation.mutate(undefined)}
 							className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-800"
 						>
 							Sign out

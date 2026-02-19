@@ -21,7 +21,11 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
+		"@orpc/client": "^1.13.5",
+		"@orpc/server": "^1.13.5",
+		"@orpc/tanstack-query": "^1.13.5",
 		"@t3-oss/env-core": "^0.13.10",
+		"@tanstack/react-query": "^5.90.21",
 		"@types/react": "^19.2.14",
 		"@types/react-dom": "^19.2.3",
 		"drizzle-orm": "^0.45.1",

@@ -66,6 +66,19 @@ export const githubDiscordUsers = pgTable(
 	(t) => [unique().on(t.webhookMappingId, t.githubUsername)],
 );
 
+export const seenGithubUsernames = pgTable(
+	"seen_github_usernames",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		webhookMappingId: uuid("webhook_mapping_id")
+			.notNull()
+			.references(() => webhookMappings.id, { onDelete: "cascade" }),
+		githubUsername: varchar("github_username", { length: 255 }).notNull(),
+		lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+	},
+	(t) => [unique().on(t.webhookMappingId, t.githubUsername)],
+);
+
 export const pingSettings = pgTable(
 	"ping_settings",
 	{

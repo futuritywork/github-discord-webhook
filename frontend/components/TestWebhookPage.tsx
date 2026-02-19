@@ -1,7 +1,7 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import type { DiscordEmbed } from "../api";
-import * as api from "../api";
-import type { User } from "../types";
+import { orpc } from "../client";
+import type { DiscordEmbed } from "../types";
 import { Nav } from "./Nav";
 
 interface FieldEntry {
@@ -24,7 +24,10 @@ export function TestWebhookPage({
 }: {
 	navigate: (path: string) => void;
 }) {
-	const [user, setUser] = useState<User | null>(null);
+	const meQuery = useQuery({
+		...orpc.auth.me.queryOptions(),
+		retry: false,
+	});
 
 	// Form state
 	const [webhookUrl, setWebhookUrl] = useState("");
@@ -41,22 +44,21 @@ export function TestWebhookPage({
 	const [imageUrl, setImageUrl] = useState("");
 	const [thumbnailUrl, setThumbnailUrl] = useState("");
 	const [fields, setFields] = useState<FieldEntry[]>([]);
-
-	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
-	const [loading, setLoading] = useState(false);
 
 	const formRef = useRef<HTMLFormElement>(null);
 
 	useEffect(() => {
-		api.getMe().then((u) => {
-			if (!u) {
-				navigate("/");
-				return;
-			}
-			setUser(u);
-		});
-	}, [navigate]);
+		if (meQuery.isError) navigate("/");
+	}, [meQuery.isError, navigate]);
+
+	const sendMutation = useMutation(
+		orpc.webhooks.test.mutationOptions({
+			onSuccess: () => {
+				setSuccess("Webhook sent successfully! Check your Discord channel.");
+			},
+		}),
+	);
 
 	const buildEmbed = (): DiscordEmbed => {
 		const embed: DiscordEmbed = {};
@@ -117,25 +119,14 @@ export function TestWebhookPage({
 		);
 	};
 
-	const handleSubmit = async (e: React.FormEvent) => {
+	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		setError("");
 		setSuccess("");
-		setLoading(true);
-		try {
-			const embed = buildEmbed();
-			if (!embed.title && !embed.description && !embed.fields?.length) {
-				throw new Error(
-					"Embed must have at least title, description, or fields",
-				);
-			}
-			await api.sendTestWebhook(webhookUrl, embed);
-			setSuccess("Webhook sent successfully! Check your Discord channel.");
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to send webhook");
-		} finally {
-			setLoading(false);
+		const embed = buildEmbed();
+		if (!embed.title && !embed.description && !embed.fields?.length) {
+			return;
 		}
+		sendMutation.mutate({ webhookUrl, embed });
 	};
 
 	const clearForm = () => {
@@ -206,6 +197,7 @@ export function TestWebhookPage({
 
 	const previewEmbed = buildEmbed();
 
+	const user = meQuery.data;
 	if (!user) return null;
 
 	return (
@@ -560,9 +552,9 @@ export function TestWebhookPage({
 
 							{/* Submit */}
 							<div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-								{error && (
+								{sendMutation.error && (
 									<div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mb-4">
-										{error}
+										{sendMutation.error.message}
 									</div>
 								)}
 								{success && (
@@ -572,10 +564,10 @@ export function TestWebhookPage({
 								)}
 								<button
 									type="submit"
-									disabled={loading}
+									disabled={sendMutation.isPending}
 									className="w-full py-3 px-4 rounded-lg text-sm font-semibold text-zinc-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
 								>
-									{loading ? "Sending..." : "Send Test Webhook"}
+									{sendMutation.isPending ? "Sending..." : "Send Test Webhook"}
 								</button>
 							</div>
 						</form>

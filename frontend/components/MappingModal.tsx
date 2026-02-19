@@ -1,5 +1,6 @@
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import * as api from "../api";
+import { orpc } from "../client";
 
 function CopyButton({ text }: { text: string }) {
 	const [copied, setCopied] = useState(false);
@@ -63,21 +64,18 @@ export function MappingModal({
 	const [repo, setRepo] = useState("");
 	const [webhookUrl, setWebhookUrl] = useState("");
 	const [secret, setSecret] = useState(() => crypto.randomUUID());
-	const [error, setError] = useState("");
-	const [loading, setLoading] = useState(false);
 
-	const handleSubmit = async (e: React.FormEvent) => {
+	const createMutation = useMutation(
+		orpc.webhooks.create.mutationOptions({
+			onSuccess: (data) => {
+				onSuccess(data.githubWebhookUrl, secret);
+			},
+		}),
+	);
+
+	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		setError("");
-		setLoading(true);
-		try {
-			const data = await api.createMapping(repo, webhookUrl, secret);
-			onSuccess(data.githubWebhookUrl, secret);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to add mapping");
-		} finally {
-			setLoading(false);
-		}
+		createMutation.mutate({ repo, webhookUrl, secret });
 	};
 
 	return (
@@ -154,9 +152,9 @@ export function MappingModal({
 							Auto-generated secret. Copy and use in GitHub webhook settings.
 						</p>
 					</div>
-					{error && (
+					{createMutation.error && (
 						<div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-							{error}
+							{createMutation.error.message}
 						</div>
 					)}
 					<div className="flex gap-3 pt-2">
@@ -169,10 +167,10 @@ export function MappingModal({
 						</button>
 						<button
 							type="submit"
-							disabled={loading}
+							disabled={createMutation.isPending}
 							className="flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold text-zinc-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 transition-all disabled:opacity-50"
 						>
-							{loading ? "Adding..." : "Add Mapping"}
+							{createMutation.isPending ? "Adding..." : "Add Mapping"}
 						</button>
 					</div>
 				</form>

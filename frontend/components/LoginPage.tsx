@@ -1,76 +1,68 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import * as api from "../api";
-import type { RegistrationMode } from "../types";
+import { orpc } from "../client";
 
 export function LoginPage({ navigate }: { navigate: (path: string) => void }) {
 	const [tab, setTab] = useState<"login" | "register">("login");
-	const [registrationMode, setRegistrationMode] =
-		useState<RegistrationMode["mode"]>("open");
-
-	// Login state
 	const [loginUsername, setLoginUsername] = useState("");
 	const [loginPassword, setLoginPassword] = useState("");
-	const [loginError, setLoginError] = useState("");
-	const [loginLoading, setLoginLoading] = useState(false);
-
-	// Register state
 	const [regUsername, setRegUsername] = useState("");
 	const [regPassword, setRegPassword] = useState("");
 	const [regInviteCode, setRegInviteCode] = useState("");
-	const [regError, setRegError] = useState("");
 	const [regSuccess, setRegSuccess] = useState("");
-	const [regLoading, setRegLoading] = useState(false);
+
+	const meQuery = useQuery({
+		...orpc.auth.me.queryOptions(),
+		retry: false,
+	});
+	const regModeQuery = useQuery(orpc.auth.registrationMode.queryOptions());
+	const registrationMode = regModeQuery.data?.mode ?? "open";
 
 	useEffect(() => {
-		api.getMe().then((user) => {
-			if (user) navigate("/dashboard");
-		});
-		api.getRegistrationMode().then((data) => {
-			setRegistrationMode(data.mode);
-		});
-	}, [navigate]);
+		if (meQuery.data) navigate("/dashboard");
+	}, [meQuery.data, navigate]);
 
-	const handleLogin = async (e: React.FormEvent) => {
+	const loginMutation = useMutation(
+		orpc.auth.login.mutationOptions({
+			onSuccess: () => navigate("/dashboard"),
+		}),
+	);
+
+	const registerMutation = useMutation(
+		orpc.auth.register.mutationOptions({
+			onSuccess: () => {
+				setRegSuccess("Account created! You can now sign in.");
+				setRegUsername("");
+				setRegPassword("");
+				setRegInviteCode("");
+				setTimeout(() => setTab("login"), 1500);
+			},
+		}),
+	);
+
+	const handleLogin = (e: React.FormEvent) => {
 		e.preventDefault();
-		setLoginError("");
-		setLoginLoading(true);
-		try {
-			await api.login(loginUsername, loginPassword);
-			navigate("/dashboard");
-		} catch (err) {
-			setLoginError(err instanceof Error ? err.message : "Login failed");
-		} finally {
-			setLoginLoading(false);
-		}
+		loginMutation.mutate({
+			username: loginUsername,
+			password: loginPassword,
+		});
 	};
 
-	const handleRegister = async (e: React.FormEvent) => {
+	const handleRegister = (e: React.FormEvent) => {
 		e.preventDefault();
-		setRegError("");
 		setRegSuccess("");
-		setRegLoading(true);
-		try {
-			await api.register(
-				regUsername,
-				regPassword,
+		registerMutation.mutate({
+			username: regUsername,
+			password: regPassword,
+			inviteCode:
 				registrationMode === "invite_only" ? regInviteCode : undefined,
-			);
-			setRegSuccess("Account created! You can now sign in.");
-			setRegUsername("");
-			setRegPassword("");
-			setRegInviteCode("");
-			setTimeout(() => setTab("login"), 1500);
-		} catch (err) {
-			setRegError(err instanceof Error ? err.message : "Registration failed");
-		} finally {
-			setRegLoading(false);
-		}
+		});
 	};
 
 	const switchTab = (t: "login" | "register") => {
 		setTab(t);
-		setLoginError("");
-		setRegError("");
+		loginMutation.reset();
+		registerMutation.reset();
 		setRegSuccess("");
 	};
 
@@ -168,17 +160,17 @@ export function LoginPage({ navigate }: { navigate: (path: string) => void }) {
 									className="mt-1.5 block w-full rounded-lg border-0 bg-zinc-800 py-2.5 px-3.5 text-zinc-100 ring-1 ring-inset ring-zinc-700 placeholder:text-zinc-500 focus:ring-2 focus:ring-inset focus:ring-emerald-500 transition-all text-sm"
 								/>
 							</div>
-							{loginError && (
+							{loginMutation.error && (
 								<div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-									{loginError}
+									{loginMutation.error.message}
 								</div>
 							)}
 							<button
 								type="submit"
-								disabled={loginLoading}
+								disabled={loginMutation.isPending}
 								className="w-full flex justify-center py-2.5 px-4 rounded-lg text-sm font-semibold text-zinc-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 focus:ring-offset-zinc-900 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
 							>
-								{loginLoading ? "Signing in..." : "Sign in"}
+								{loginMutation.isPending ? "Signing in..." : "Sign in"}
 							</button>
 						</form>
 					)}
@@ -249,9 +241,9 @@ export function LoginPage({ navigate }: { navigate: (path: string) => void }) {
 									Registration is currently closed.
 								</div>
 							)}
-							{regError && (
+							{registerMutation.error && (
 								<div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-									{regError}
+									{registerMutation.error.message}
 								</div>
 							)}
 							{regSuccess && (
@@ -261,10 +253,14 @@ export function LoginPage({ navigate }: { navigate: (path: string) => void }) {
 							)}
 							<button
 								type="submit"
-								disabled={regLoading || registrationMode === "closed"}
+								disabled={
+									registerMutation.isPending || registrationMode === "closed"
+								}
 								className="w-full flex justify-center py-2.5 px-4 rounded-lg text-sm font-semibold text-zinc-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 focus:ring-offset-zinc-900 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
-								{regLoading ? "Creating account..." : "Create account"}
+								{registerMutation.isPending
+									? "Creating account..."
+									: "Create account"}
 							</button>
 						</form>
 					)}

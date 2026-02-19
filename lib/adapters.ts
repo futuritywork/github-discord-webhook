@@ -4,12 +4,14 @@ import {
 	DatabaseGitHubDiscordUserAdapter,
 	DatabaseInviteAdapter,
 	DatabasePingSettingsAdapter,
+	DatabaseSeenGithubUsernamesAdapter,
 	DatabaseSessionAdapter,
 	DatabaseUserAdapter,
 	DatabaseWebhookMappingAdapter,
 	type GitHubDiscordUserAdapter,
 	type InviteAdapter,
 	type PingSettingsAdapter,
+	type SeenGithubUsernamesAdapter,
 	type SessionAdapter,
 	type UserAdapter,
 	type WebhookMappingAdapter,
@@ -36,3 +38,6 @@ export const githubDiscordUserAdapter: GitHubDiscordUserAdapter =
 
 export const pingSettingsAdapter: PingSettingsAdapter =
 	new DatabasePingSettingsAdapter();
+
+export const seenGithubUsernamesAdapter: SeenGithubUsernamesAdapter =
+	new DatabaseSeenGithubUsernamesAdapter();

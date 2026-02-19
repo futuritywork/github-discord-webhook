@@ -1,5 +1,6 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import * as api from "../api";
+import { orpc } from "../client";
 import type { WebhookMapping } from "../types";
 
 function CopyButton({ text }: { text: string }) {
@@ -56,23 +57,31 @@ function CopyButton({ text }: { text: string }) {
 
 export function MappingList({
 	mappings,
-	onReload,
 	onOpenSettings,
 	onRegenerateSecret,
 }: {
 	mappings: WebhookMapping[];
-	onReload: () => void;
 	onOpenSettings: (mappingId: string, repo: string) => void;
 	onRegenerateSecret: (repo: string) => void;
 }) {
-	const handleDelete = async (repo: string) => {
+	const queryClient = useQueryClient();
+
+	const deleteMutation = useMutation(
+		orpc.webhooks.delete.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({
+					queryKey: orpc.webhooks.key(),
+				});
+			},
+			onError: (err) => {
+				alert(err.message);
+			},
+		}),
+	);
+
+	const handleDelete = (repo: string) => {
 		if (!confirm(`Delete mapping for ${repo}?`)) return;
-		try {
-			await api.deleteMapping(repo);
-			onReload();
-		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to delete");
-		}
+		deleteMutation.mutate({ repo });
 	};
 
 	if (mappings.length === 0) {

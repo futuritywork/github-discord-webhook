@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import * as api from "../api";
-import type { RegistrationMode, User, WebhookMapping } from "../types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { orpc } from "../client";
 import { InviteSection } from "./InviteSection";
 import { MappingList } from "./MappingList";
 import { MappingModal } from "./MappingModal";
@@ -14,10 +14,14 @@ export function DashboardPage({
 }: {
 	navigate: (path: string) => void;
 }) {
-	const [user, setUser] = useState<User | null>(null);
-	const [mappings, setMappings] = useState<WebhookMapping[]>([]);
-	const [registrationMode, setRegistrationMode] =
-		useState<RegistrationMode["mode"]>("open");
+	const queryClient = useQueryClient();
+
+	const meQuery = useQuery({
+		...orpc.auth.me.queryOptions(),
+		retry: false,
+	});
+	const mappingsQuery = useQuery(orpc.webhooks.list.queryOptions());
+	const regModeQuery = useQuery(orpc.auth.registrationMode.queryOptions());
 
 	// Modal state
 	const [showAddModal, setShowAddModal] = useState(false);
@@ -34,28 +38,22 @@ export function DashboardPage({
 		repo: string;
 	} | null>(null);
 
-	const loadMappings = useCallback(async () => {
-		try {
-			const data = await api.getMappings();
-			setMappings(data);
-		} catch {
-			// ignore
-		}
-	}, []);
-
 	useEffect(() => {
-		api.getMe().then((u) => {
-			if (!u) {
-				navigate("/");
-				return;
-			}
-			setUser(u);
-		});
-		loadMappings();
-		api.getRegistrationMode().then((d) => setRegistrationMode(d.mode));
-	}, [navigate, loadMappings]);
+		if (meQuery.isError) navigate("/");
+	}, [meQuery.isError, navigate]);
 
-	const handleRegenerateSecret = async (repo: string) => {
+	const regenerateSecretMutation = useMutation(
+		orpc.webhooks.updateSecret.mutationOptions({
+			onSuccess: (_data, variables) => {
+				setSecretData({
+					repo: variables.repo,
+					secret: variables.secret,
+				});
+			},
+		}),
+	);
+
+	const handleRegenerateSecret = (repo: string) => {
 		if (
 			!confirm(
 				`Regenerate secret for ${repo}?\n\nYou'll need to update the secret in GitHub's webhook settings.`,
@@ -63,15 +61,14 @@ export function DashboardPage({
 		)
 			return;
 		const newSecret = crypto.randomUUID();
-		try {
-			await api.regenerateSecret(repo, newSecret);
-			setSecretData({ repo, secret: newSecret });
-		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to regenerate secret");
-		}
+		regenerateSecretMutation.mutate({ repo, secret: newSecret });
 	};
 
+	const user = meQuery.data;
 	if (!user) return null;
+
+	const mappings = mappingsQuery.data ?? [];
+	const registrationMode = regModeQuery.data?.mode ?? "open";
 
 	return (
 		<div className="min-h-full">
@@ -97,7 +94,6 @@ export function DashboardPage({
 					<div className="divide-y divide-zinc-800">
 						<MappingList
 							mappings={mappings}
-							onReload={loadMappings}
 							onOpenSettings={(id, repo) =>
 								setSettingsData({ mappingId: id, repo })
 							}
@@ -117,7 +113,9 @@ export function DashboardPage({
 					onSuccess={(url, secret) => {
 						setShowAddModal(false);
 						setSuccessData({ url, secret });
-						loadMappings();
+						queryClient.invalidateQueries({
+							queryKey: orpc.webhooks.key(),
+						});
 					}}
 				/>
 			)}

@@ -1,30 +1,44 @@
+import { RPCHandler } from "@orpc/server/fetch";
+import {
+	RequestHeadersPlugin,
+	ResponseHeadersPlugin,
+} from "@orpc/server/plugins";
 import { $ } from "bun";
 import { Hono } from "hono";
 import { inviteAdapter } from "./lib/adapters";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
-import authApp from "./routes/auth";
 import { githubWebhookApp } from "./routes/github-webhook";
-import { pingSettingsApp } from "./routes/ping-settings";
 import staticApp from "./routes/static";
-import { testWebhookApp } from "./routes/test-webhook";
-import { webhookMappingApp } from "./routes/webhook";
+import { router } from "./rpc";
 
 await $`bunx drizzle-kit migrate`;
 
 const app = new Hono();
+
+const rpcHandler = new RPCHandler(router, {
+	plugins: [new RequestHeadersPlugin(), new ResponseHeadersPlugin()],
+});
 
 // Health check endpoint
 app.get("/health", (c) => {
 	return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Mount feature-based routes (API routes before static catch-all)
-app.route("/auth", authApp);
+// oRPC handler
+app.on(["POST", "GET"], "/rpc/*", async (c) => {
+	const { matched, response } = await rpcHandler.handle(c.req.raw, {
+		prefix: "/rpc",
+		context: { requestUrl: c.req.url },
+	});
+	if (matched) return response;
+	return c.notFound();
+});
+
+// Keep github webhook as plain Hono route
 app.route("/webhook", githubWebhookApp);
-app.route("/webhooks", webhookMappingApp);
-app.route("/ping-settings", pingSettingsApp);
-app.route("/webhooks", testWebhookApp);
+
+// Keep static serving
 app.route("/", staticApp);
 
 // Global error handler

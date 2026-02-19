@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import * as api from "../api";
-import type { EventKey, GitHubDiscordUser, PingSettings } from "../types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { orpc } from "../client";
+import type { EventKey } from "../types";
 import { EVENT_LABELS } from "../types";
 
 export function SettingsModal({
@@ -12,33 +13,75 @@ export function SettingsModal({
 	repo: string;
 	onClose: () => void;
 }) {
-	const [settings, setSettings] = useState<PingSettings | null>(null);
-	const [users, setUsers] = useState<GitHubDiscordUser[]>([]);
+	const queryClient = useQueryClient();
 	const [pingError, setPingError] = useState("");
 	const [userError, setUserError] = useState("");
 	const [newGithub, setNewGithub] = useState("");
 	const [newDiscord, setNewDiscord] = useState("");
 
-	useEffect(() => {
-		api.getPingSettings(mappingId).then(setSettings);
-		api.getDiscordUsers(mappingId).then(setUsers);
-	}, [mappingId]);
+	const settingsQuery = useQuery(
+		orpc.pingSettings.get.queryOptions({ input: { mappingId } }),
+	);
+	const usersQuery = useQuery(
+		orpc.pingSettings.listDiscordUsers.queryOptions({ input: { mappingId } }),
+	);
 
-	const toggleSetting = async (key: EventKey, enabled: boolean) => {
+	const settings = settingsQuery.data;
+	const users = usersQuery.data ?? [];
+
+	const toggleMutation = useMutation(
+		orpc.pingSettings.update.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({
+					queryKey: orpc.pingSettings.get.key({ input: { mappingId } }),
+				});
+				setPingError("");
+			},
+			onError: (err) => {
+				setPingError(err.message);
+			},
+		}),
+	);
+
+	const addUserMutation = useMutation(
+		orpc.pingSettings.addDiscordUser.mutationOptions({
+			onSuccess: () => {
+				setNewGithub("");
+				setNewDiscord("");
+				setUserError("");
+				queryClient.invalidateQueries({
+					queryKey: orpc.pingSettings.listDiscordUsers.key({
+						input: { mappingId },
+					}),
+				});
+			},
+			onError: (err) => {
+				setUserError(err.message);
+			},
+		}),
+	);
+
+	const deleteUserMutation = useMutation(
+		orpc.pingSettings.deleteDiscordUser.mutationOptions({
+			onSuccess: () => {
+				queryClient.invalidateQueries({
+					queryKey: orpc.pingSettings.listDiscordUsers.key({
+						input: { mappingId },
+					}),
+				});
+			},
+			onError: (err) => {
+				alert(err.message);
+			},
+		}),
+	);
+
+	const toggleSetting = (key: EventKey, enabled: boolean) => {
 		setPingError("");
-		try {
-			const updated = await api.updatePingSettings(mappingId, {
-				[key]: enabled,
-			});
-			setSettings(updated);
-		} catch (err) {
-			setPingError(
-				err instanceof Error ? err.message : "Failed to update setting",
-			);
-		}
+		toggleMutation.mutate({ mappingId, settings: { [key]: enabled } });
 	};
 
-	const addUserMapping = async () => {
+	const addUserMapping = () => {
 		setUserError("");
 		const githubUsername = newGithub.trim();
 		const discordUserId = newDiscord.trim();
@@ -46,29 +89,7 @@ export function SettingsModal({
 			setUserError("Both fields are required");
 			return;
 		}
-		try {
-			await api.addDiscordUser(mappingId, githubUsername, discordUserId);
-			setNewGithub("");
-			setNewDiscord("");
-			const updated = await api.getDiscordUsers(mappingId);
-			setUsers(updated);
-		} catch (err) {
-			setUserError(
-				err instanceof Error ? err.message : "Failed to add user mapping",
-			);
-		}
-	};
-
-	const deleteUserMapping = async (id: string) => {
-		try {
-			await api.deleteDiscordUser(mappingId, id);
-			const updated = await api.getDiscordUsers(mappingId);
-			setUsers(updated);
-		} catch (err) {
-			alert(
-				err instanceof Error ? err.message : "Failed to delete user mapping",
-			);
-		}
+		addUserMutation.mutate({ mappingId, githubUsername, discordUserId });
 	};
 
 	return (
@@ -166,7 +187,9 @@ export function SettingsModal({
 									</span>
 									<button
 										type="button"
-										onClick={() => deleteUserMapping(u.id)}
+										onClick={() =>
+											deleteUserMutation.mutate({ mappingId, id: u.id })
+										}
 										className="p-1 text-zinc-500 hover:text-red-400 rounded transition-colors shrink-0"
 										title="Remove"
 									>
