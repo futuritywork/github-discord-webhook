@@ -4,6 +4,7 @@ import { pingSettings } from "../schemas/db";
 
 export const EVENT_KEYS = [
 	"pr_opened",
+	"pr_draft_opened",
 	"pr_closed",
 	"pr_merged",
 	"pr_converted_to_draft",
@@ -17,6 +18,7 @@ export type EventKey = (typeof EVENT_KEYS)[number];
 
 export const DEFAULT_PING_SETTINGS: Record<EventKey, boolean> = {
 	pr_opened: false,
+	pr_draft_opened: false,
 	pr_closed: false,
 	pr_merged: false,
 	pr_converted_to_draft: false,

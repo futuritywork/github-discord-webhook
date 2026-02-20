@@ -330,12 +330,14 @@ githubWebhookApp.post("/github/:id", async (c) => {
 		}
 
 		switch (parsedBody.action) {
-			case "opened":
+			case "opened": {
 				embed = handleOpened(parsedBody);
-				eventKey = "pr_opened";
+				const isDraft = parsedBody.pull_request.draft ?? false;
+				eventKey = isDraft ? "pr_draft_opened" : "pr_opened";
 				pingGithubUsername = parsedBody.pull_request.user.login;
 				eventActorUsername = parsedBody.pull_request.user.login;
 				break;
+			}
 			case "closed":
 				embed = handleClosed(parsedBody);
 				eventKey = parsedBody.pull_request.merged ? "pr_merged" : "pr_closed";

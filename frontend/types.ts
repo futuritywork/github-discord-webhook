@@ -39,6 +39,7 @@ export interface DiscordEmbed {
 
 export const EVENT_LABELS: Record<EventKey, string> = {
 	pr_opened: "PR Opened",
+	pr_draft_opened: "Draft PR Opened",
 	pr_closed: "PR Closed (not merged)",
 	pr_merged: "PR Merged",
 	pr_converted_to_draft: "PR Converted to Draft",
