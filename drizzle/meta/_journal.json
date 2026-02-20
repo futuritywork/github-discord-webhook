@@ -1,41 +1,48 @@
 {
-	"version": "7",
-	"dialect": "postgresql",
-	"entries": [
-		{
-			"idx": 0,
-			"version": "7",
-			"when": 1767312510335,
-			"tag": "0000_thankful_guardian",
-			"breakpoints": true
-		},
-		{
-			"idx": 1,
-			"version": "7",
-			"when": 1767393965146,
-			"tag": "0001_thick_marvel_apes",
-			"breakpoints": true
-		},
-		{
-			"idx": 2,
-			"version": "7",
-			"when": 1770344382377,
-			"tag": "0002_previous_santa_claus",
-			"breakpoints": true
-		},
-		{
-			"idx": 3,
-			"version": "7",
-			"when": 1771456684598,
-			"tag": "0003_faulty_jimmy_woo",
-			"breakpoints": true
-		},
-		{
-			"idx": 4,
-			"version": "7",
-			"when": 1771468388966,
-			"tag": "0004_swift_frightful_four",
-			"breakpoints": true
-		}
-	]
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1767312510335,
+      "tag": "0000_thankful_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767393965146,
+      "tag": "0001_thick_marvel_apes",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770344382377,
+      "tag": "0002_previous_santa_claus",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771456684598,
+      "tag": "0003_faulty_jimmy_woo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771468388966,
+      "tag": "0004_swift_frightful_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771631205592,
+      "tag": "0005_add_pr_draft_opened_event",
+      "breakpoints": true
+    }
+  ]
 }
