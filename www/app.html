@@ -24,6 +24,8 @@
 		body { font-family: 'JetBrains Mono', monospace; }
 		.fade-in { animation: fadeIn 0.2s ease-out; }
 		@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+		.slide-in { animation: slideIn 0.2s ease-out; }
+		@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 	</style>
 </head>
 <body class="min-h-full bg-zinc-950 text-zinc-100">

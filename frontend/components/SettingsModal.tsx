@@ -259,6 +259,10 @@ export function SettingsModal({
 	const seenUsernames = seenQuery.data ?? [];
 	const reviewerPings = reviewerPingsQuery.data ?? [];
 
+	const discordToGithub = new Map(
+		users.map((u) => [u.discordUserId, u.githubUsername]),
+	);
+
 	// Filter out usernames that already have a mapping
 	const mappedUsernames = new Set(users.map((u) => u.githubUsername));
 	const availableSuggestions = seenUsernames.filter(
@@ -427,12 +431,12 @@ export function SettingsModal({
 	};
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center">
+		<div className="fixed inset-0 z-50 flex justify-end">
 			<div
 				className="absolute inset-0 bg-black/60 backdrop-blur-sm"
 				onClick={onClose}
 			/>
-			<div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl fade-in max-h-[90vh] overflow-y-auto">
+			<div className="relative bg-zinc-900 border-l border-zinc-800 p-6 w-full max-w-2xl h-full shadow-2xl slide-in overflow-y-auto">
 				<div className="flex items-center justify-between mb-4">
 					<h3 className="text-lg font-semibold">Ping Settings</h3>
 					<span className="text-sm text-zinc-400">{repo}</span>
@@ -614,8 +618,16 @@ export function SettingsModal({
 								className="px-3 py-2.5 rounded-lg bg-zinc-800/50 space-y-1.5"
 							>
 								<div className="flex items-center justify-between">
-									<span className="text-sm text-violet-400 font-mono">
-										{rp.discordUserId}
+									<span className="text-sm">
+										<span className="text-violet-400 font-mono">
+											{rp.discordUserId}
+										</span>
+										{discordToGithub.get(rp.discordUserId) && (
+											<span className="text-zinc-500">
+												{" "}
+												- {discordToGithub.get(rp.discordUserId)}
+											</span>
+										)}
 									</span>
 									<div className="flex gap-1">
 										<button
