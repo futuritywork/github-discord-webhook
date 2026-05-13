@@ -35,17 +35,32 @@ export type DiscordEmbed = {
 	}>;
 };
 
-/** Send an embed to a Discord webhook, with optional content for pings */
+/** Send an embed to a Discord webhook, with optional content/sender overrides */
 export async function sendDiscordEmbed(
 	webhookUrl: string,
 	embed: DiscordEmbed,
-	content?: string,
+	options: {
+		content?: string;
+		username?: string;
+		avatarUrl?: string;
+	} = {},
 ): Promise<{ ok: boolean; status: number }> {
-	const payload: { embeds: DiscordEmbed[]; content?: string } = {
+	const payload: {
+		embeds: DiscordEmbed[];
+		content?: string;
+		username?: string;
+		avatar_url?: string;
+	} = {
 		embeds: [embed],
 	};
-	if (content) {
-		payload.content = content;
+	if (options.content) {
+		payload.content = options.content;
+	}
+	if (options.username) {
+		payload.username = options.username;
+	}
+	if (options.avatarUrl) {
+		payload.avatar_url = options.avatarUrl;
 	}
 	const response = await fetch(webhookUrl, {
 		method: "POST",

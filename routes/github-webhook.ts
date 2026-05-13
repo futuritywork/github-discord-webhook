@@ -42,15 +42,26 @@ type ReviewCommentCreatedPayload = Extract<
 	{ action: "created" }
 >;
 
-// Callback for "opened" action - returns DiscordEmbed
-function handleOpened(payload: OpenPayload): DiscordEmbed {
+type DiscordMessageParts = {
+	embed: DiscordEmbed;
+	content: string;
+	username: string;
+	avatarUrl: string;
+};
+
+// Callback for "opened" action
+function handleOpened(payload: OpenPayload): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
 	const isDraft = pr.draft ?? false;
 
-	return {
+	const { text, images } = pr?.body
+		? filterBody(pr.body)
+		: { text: "No description", images: [] };
+
+	const embed: DiscordEmbed = {
 		title: `[${payload.repository.name}]: ${isDraft ? "Draft " : ""}PR #${pr?.number} Opened: ${pr?.title ?? "Unknown"}`,
-		description: pr?.body ? filterBody(pr.body) : "No description",
+		description: text,
 		url: pr?.html_url,
 		color: isDraft ? colors.gray : colors.green,
 		footer: { text: repoFullName },
@@ -60,6 +71,7 @@ function handleOpened(payload: OpenPayload): DiscordEmbed {
 			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
+		...(images[0] && { image: { url: images[0] } }),
 		fields: [
 			{
 				name: "Author",
@@ -68,17 +80,28 @@ function handleOpened(payload: OpenPayload): DiscordEmbed {
 			},
 		],
 	};
+
+	return {
+		embed,
+		content: `${pr.user.login} opened ${isDraft ? "draft " : ""}PR #${pr.number} in ${repoFullName}: "${pr.title}"`,
+		username: `${repoFullName} · PR #${pr.number}`,
+		avatarUrl: pr.user.avatar_url,
+	};
 }
 
-// Callback for "closed" action - returns DiscordEmbed
-function handleClosed(payload: ClosedPayload): DiscordEmbed {
+// Callback for "closed" action
+function handleClosed(payload: ClosedPayload): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository.full_name ?? "Unknown";
 	const isMerged = pr.merged ?? false;
 
-	return {
+	const { text, images } = pr?.body
+		? filterBody(pr.body)
+		: { text: "No description", images: [] };
+
+	const embed: DiscordEmbed = {
 		title: `[${payload.repository.name}]: PR #${pr?.number} ${isMerged ? "Merged" : "Closed"}: ${pr?.title ?? "Unknown"}`,
-		description: pr?.body ? filterBody(pr.body) : "No description",
+		description: text,
 		author: {
 			name: pr.user.login,
 			url: pr.user.html_url,
@@ -88,6 +111,7 @@ function handleClosed(payload: ClosedPayload): DiscordEmbed {
 		color: isMerged ? colors.purple : colors.red,
 		footer: { text: repoFullName },
 		timestamp: pr?.closed_at?.toISOString() ?? new Date().toISOString(),
+		...(images[0] && { image: { url: images[0] } }),
 		fields: [
 			{
 				name: "Author",
@@ -110,18 +134,34 @@ function handleClosed(payload: ClosedPayload): DiscordEmbed {
 				: []),
 		],
 	};
+
+	const merger = pr.merged_by?.login ?? pr.user.login;
+	const content = isMerged
+		? `${merger} merged PR #${pr.number} by ${pr.user.login}: "${pr.title}"`
+		: `${pr.user.login} closed PR #${pr.number}: "${pr.title}"`;
+
+	return {
+		embed,
+		content,
+		username: `${repoFullName} · PR #${pr.number}`,
+		avatarUrl: (isMerged && pr.merged_by?.avatar_url) || pr.user.avatar_url,
+	};
 }
 
-// Callback for "converted_to_draft" action - returns DiscordEmbed
+// Callback for "converted_to_draft" action
 function handleConvertedToDraft(
 	payload: ConvertedToDraftPayload,
-): DiscordEmbed {
+): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
 
-	return {
+	const { text, images } = pr?.body
+		? filterBody(pr.body)
+		: { text: "No description", images: [] };
+
+	const embed: DiscordEmbed = {
 		title: `[${payload.repository.name}]: PR #${pr?.number} Converted to Draft: ${pr?.title ?? "Unknown"}`,
-		description: pr?.body ? filterBody(pr.body) : "No description",
+		description: text,
 		url: pr?.html_url,
 		color: colors.gray,
 		footer: { text: repoFullName },
@@ -131,6 +171,7 @@ function handleConvertedToDraft(
 			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
+		...(images[0] && { image: { url: images[0] } }),
 		fields: [
 			{
 				name: "Author",
@@ -139,16 +180,29 @@ function handleConvertedToDraft(
 			},
 		],
 	};
+
+	return {
+		embed,
+		content: `${pr.user.login} converted PR #${pr.number} back to draft: "${pr.title}"`,
+		username: `${repoFullName} · PR #${pr.number}`,
+		avatarUrl: pr.user.avatar_url,
+	};
 }
 
-// Callback for "ready_for_review" action - returns DiscordEmbed
-function handleReadyForReview(payload: ReadyForReviewPayload): DiscordEmbed {
+// Callback for "ready_for_review" action
+function handleReadyForReview(
+	payload: ReadyForReviewPayload,
+): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
 
-	return {
+	const { text, images } = pr?.body
+		? filterBody(pr.body)
+		: { text: "No description", images: [] };
+
+	const embed: DiscordEmbed = {
 		title: `[${payload.repository.name}]: PR #${pr?.number} Ready for Review: ${pr?.title ?? "Unknown"}`,
-		description: pr?.body ? filterBody(pr.body) : "No description",
+		description: text,
 		url: pr?.html_url,
 		color: colors.green,
 		footer: { text: repoFullName },
@@ -158,6 +212,7 @@ function handleReadyForReview(payload: ReadyForReviewPayload): DiscordEmbed {
 			url: pr.user.html_url,
 			icon_url: pr.user.avatar_url,
 		},
+		...(images[0] && { image: { url: images[0] } }),
 		fields: [
 			{
 				name: "Author",
@@ -166,10 +221,19 @@ function handleReadyForReview(payload: ReadyForReviewPayload): DiscordEmbed {
 			},
 		],
 	};
+
+	return {
+		embed,
+		content: `${pr.user.login} marked PR #${pr.number} ready for review: "${pr.title}"`,
+		username: `${repoFullName} · PR #${pr.number}`,
+		avatarUrl: pr.user.avatar_url,
+	};
 }
 
-// Callback for pull_request_review "submitted" action - returns DiscordEmbed
-function handleReviewSubmitted(payload: ReviewSubmittedPayload): DiscordEmbed {
+// Callback for pull_request_review "submitted" action
+function handleReviewSubmitted(
+	payload: ReviewSubmittedPayload,
+): DiscordMessageParts {
 	const review = payload.review;
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
@@ -186,9 +250,19 @@ function handleReviewSubmitted(payload: ReviewSubmittedPayload): DiscordEmbed {
 		commented: 0x6e7681, // gray
 	};
 
-	return {
+	const stateVerbs: Record<typeof review.state, string> = {
+		approved: "approved",
+		changes_requested: "requested changes on",
+		commented: "commented on",
+	};
+
+	const { text, images } = review.body
+		? filterBody(review.body)
+		: { text: "No comment", images: [] };
+
+	const embed: DiscordEmbed = {
 		title: `[${payload.repository.name}]: PR #${pr.number} Review: ${stateLabels[review.state]}`,
-		description: review.body ? filterBody(review.body) : "No comment",
+		description: text,
 		url: review.html_url,
 		color: stateColors[review.state],
 		footer: { text: repoFullName },
@@ -198,6 +272,7 @@ function handleReviewSubmitted(payload: ReviewSubmittedPayload): DiscordEmbed {
 			url: review.user.html_url,
 			icon_url: review.user.avatar_url,
 		},
+		...(images[0] && { image: { url: images[0] } }),
 		fields: [
 			{
 				name: "PR Title",
@@ -216,17 +291,25 @@ function handleReviewSubmitted(payload: ReviewSubmittedPayload): DiscordEmbed {
 			},
 		],
 	};
+
+	return {
+		embed,
+		content: `${review.user.login} ${stateVerbs[review.state]} PR #${pr.number} (${pr.user.login}): "${pr.title}"`,
+		username: `${repoFullName} · PR #${pr.number}`,
+		avatarUrl: review.user.avatar_url,
+	};
 }
 
-// Callback for pull_request_review_comment "created" action - returns DiscordEmbed
+// Callback for pull_request_review_comment "created" action
 function handleReviewCommentCreated(
 	payload: ReviewCommentCreatedPayload,
-): DiscordEmbed {
+): DiscordMessageParts {
 	const comment = payload.comment;
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
 
-	const description = filterBody(comment.body).trim() || "No comment";
+	const { text, images } = filterBody(comment.body);
+	const description = text.trim() || "No comment";
 	const filePath = comment.path;
 	const line = comment.line;
 	const locationStr =
@@ -236,7 +319,7 @@ function handleReviewCommentCreated(
 				? `\`${filePath}\``
 				: null;
 
-	return {
+	const embed: DiscordEmbed = {
 		title: `[${payload.repository.name}]: PR #${pr.number} Comment`,
 		description: locationStr ? `${locationStr}\n\n${description}` : description,
 		url: comment.html_url,
@@ -248,6 +331,7 @@ function handleReviewCommentCreated(
 			url: comment.user.html_url,
 			icon_url: comment.user.avatar_url,
 		},
+		...(images[0] && { image: { url: images[0] } }),
 		fields: [
 			{
 				name: "PR Title",
@@ -265,6 +349,20 @@ function handleReviewCommentCreated(
 				inline: true,
 			},
 		],
+	};
+
+	const plainLocation =
+		filePath && line
+			? ` at ${filePath}:${line}`
+			: filePath
+				? ` at ${filePath}`
+				: "";
+
+	return {
+		embed,
+		content: `${comment.user.login} commented on PR #${pr.number} (${pr.user.login})${plainLocation}`,
+		username: `${repoFullName} · PR #${pr.number}`,
+		avatarUrl: comment.user.avatar_url,
 	};
 }
 
@@ -296,7 +394,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 
 	const { body, webhookUrl, repo, webhookMappingId } = verifyResult.data;
 
-	let embed: DiscordEmbed;
+	let messageParts: DiscordMessageParts;
 	let action: string;
 	let eventKey: EventKey | undefined;
 	let pingGithubUsername: string | undefined;
@@ -331,7 +429,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 
 		switch (parsedBody.action) {
 			case "opened": {
-				embed = handleOpened(parsedBody);
+				messageParts = handleOpened(parsedBody);
 				const isDraft = parsedBody.pull_request.draft ?? false;
 				eventKey = isDraft ? "pr_draft_opened" : "pr_opened";
 				pingGithubUsername = parsedBody.pull_request.user.login;
@@ -339,7 +437,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 				break;
 			}
 			case "closed":
-				embed = handleClosed(parsedBody);
+				messageParts = handleClosed(parsedBody);
 				eventKey = parsedBody.pull_request.merged ? "pr_merged" : "pr_closed";
 				pingGithubUsername = parsedBody.pull_request.user.login;
 				eventActorUsername =
@@ -349,13 +447,13 @@ githubWebhookApp.post("/github/:id", async (c) => {
 						: parsedBody.pull_request.user.login;
 				break;
 			case "converted_to_draft":
-				embed = handleConvertedToDraft(parsedBody);
+				messageParts = handleConvertedToDraft(parsedBody);
 				eventKey = "pr_converted_to_draft";
 				pingGithubUsername = parsedBody.pull_request.user.login;
 				eventActorUsername = parsedBody.pull_request.user.login;
 				break;
 			case "ready_for_review":
-				embed = handleReadyForReview(parsedBody);
+				messageParts = handleReadyForReview(parsedBody);
 				eventKey = "pr_ready_for_review";
 				pingGithubUsername = parsedBody.pull_request.user.login;
 				eventActorUsername = parsedBody.pull_request.user.login;
@@ -403,7 +501,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 							"Review comment with no body (line comments handled by pull_request_review_comment)",
 					});
 				}
-				embed = handleReviewSubmitted(parsedBody);
+				messageParts = handleReviewSubmitted(parsedBody);
 				const reviewState = parsedBody.review.state;
 				if (reviewState === "approved") {
 					eventKey = "review_approved";
@@ -437,7 +535,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 
 		switch (parsedBody.action) {
 			case "created": {
-				embed = handleReviewCommentCreated(parsedBody);
+				messageParts = handleReviewCommentCreated(parsedBody);
 				eventKey = "review_commented";
 				pingGithubUsername = parsedBody.pull_request.user.login;
 				eventActorUsername = parsedBody.comment.user.login;
@@ -517,7 +615,15 @@ githubWebhookApp.post("/github/:id", async (c) => {
 	const pingContent =
 		pingMentions.size > 0 ? [...pingMentions].join(" ") : undefined;
 
-	const result = await sendDiscordEmbed(webhookUrl, embed, pingContent);
+	const finalContent = pingContent
+		? `${pingContent} ${messageParts.content}`
+		: messageParts.content;
+
+	const result = await sendDiscordEmbed(webhookUrl, messageParts.embed, {
+		content: finalContent,
+		username: messageParts.username,
+		avatarUrl: messageParts.avatarUrl,
+	});
 
 	if (!result.ok) {
 		return c.json(
