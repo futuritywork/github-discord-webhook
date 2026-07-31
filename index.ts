@@ -41,9 +41,20 @@ app.route("/webhook", githubWebhookApp);
 // Keep static serving
 app.route("/", staticApp);
 
-// Global error handler
+// Global error handler.
+// The GitHub delivery GUID is logged so a 500 in Railway can be matched
+// one-to-one against an entry in the repo's "Recent Deliveries" list.
 app.onError((err, c) => {
-	logger.error({ err }, "Server error");
+	logger.error(
+		{
+			err,
+			method: c.req.method,
+			path: c.req.path,
+			githubEvent: c.req.header("X-GitHub-Event"),
+			githubDelivery: c.req.header("X-GitHub-Delivery"),
+		},
+		"Server error",
+	);
 	return c.json({ error: "Internal Server Error" }, 500);
 });
 

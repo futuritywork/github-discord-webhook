@@ -626,6 +626,17 @@ githubWebhookApp.post("/github/:id", async (c) => {
 	});
 
 	if (!result.ok) {
+		logger.error(
+			{
+				discordStatus: result.status,
+				eventType,
+				action,
+				repo,
+				descriptionLength: messageParts.embed.description?.length,
+				contentLength: finalContent.length,
+			},
+			"Discord rejected the webhook message",
+		);
 		return c.json(
 			{ error: "Failed to send Discord notification", status: result.status },
 			502,
