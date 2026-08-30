@@ -7,6 +7,7 @@ import {
 	seenGithubUsernamesAdapter,
 } from "../lib/adapters";
 import { colors } from "../lib/colors";
+import { diffStatField, diffStatSuffix } from "../lib/diffStat";
 import { type DiscordEmbed, sendDiscordEmbed } from "../lib/discord";
 import { filterBody } from "../lib/filterBody";
 import { logger } from "../lib/logger";
@@ -76,14 +77,15 @@ function handleOpened(payload: OpenPayload): DiscordMessageParts {
 			{
 				name: "Author",
 				value: pr.user.login,
-				inline: false,
+				inline: true,
 			},
+			...diffStatField(pr),
 		],
 	};
 
 	return {
 		embed,
-		content: `${pr.user.login} opened ${isDraft ? "draft " : ""}PR #${pr.number} in ${repoFullName}: "${pr.title}"`,
+		content: `${pr.user.login} opened ${isDraft ? "draft " : ""}PR #${pr.number} in ${repoFullName}: "${pr.title}"${diffStatSuffix(pr)}`,
 		username: `${repoFullName} · PR #${pr.number}`,
 		avatarUrl: pr.user.avatar_url,
 	};
@@ -116,8 +118,9 @@ function handleClosed(payload: ClosedPayload): DiscordMessageParts {
 			{
 				name: "Author",
 				value: pr.user.login,
-				inline: false,
+				inline: true,
 			},
+			...diffStatField(pr),
 			...(isMerged && pr.merge_commit_sha
 				? [
 						{
@@ -136,9 +139,10 @@ function handleClosed(payload: ClosedPayload): DiscordMessageParts {
 	};
 
 	const merger = pr.merged_by?.login ?? pr.user.login;
+	const size = diffStatSuffix(pr);
 	const content = isMerged
-		? `${merger} merged PR #${pr.number} by ${pr.user.login}: "${pr.title}"`
-		: `${pr.user.login} closed PR #${pr.number}: "${pr.title}"`;
+		? `${merger} merged PR #${pr.number} by ${pr.user.login}: "${pr.title}"${size}`
+		: `${pr.user.login} closed PR #${pr.number}: "${pr.title}"${size}`;
 
 	return {
 		embed,
@@ -176,14 +180,15 @@ function handleConvertedToDraft(
 			{
 				name: "Author",
 				value: pr.user.login,
-				inline: false,
+				inline: true,
 			},
+			...diffStatField(pr),
 		],
 	};
 
 	return {
 		embed,
-		content: `${pr.user.login} converted PR #${pr.number} back to draft: "${pr.title}"`,
+		content: `${pr.user.login} converted PR #${pr.number} back to draft: "${pr.title}"${diffStatSuffix(pr)}`,
 		username: `${repoFullName} · PR #${pr.number}`,
 		avatarUrl: pr.user.avatar_url,
 	};
@@ -217,14 +222,15 @@ function handleReadyForReview(
 			{
 				name: "Author",
 				value: pr.user.login,
-				inline: false,
+				inline: true,
 			},
+			...diffStatField(pr),
 		],
 	};
 
 	return {
 		embed,
-		content: `${pr.user.login} marked PR #${pr.number} ready for review: "${pr.title}"`,
+		content: `${pr.user.login} marked PR #${pr.number} ready for review: "${pr.title}"${diffStatSuffix(pr)}`,
 		username: `${repoFullName} · PR #${pr.number}`,
 		avatarUrl: pr.user.avatar_url,
 	};

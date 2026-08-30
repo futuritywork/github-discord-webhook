@@ -8,6 +8,16 @@ const userSchema = z.object({
 	html_url: z.string(),
 });
 
+// GitHub sends these on the full `pull_request` representation that
+// `pull_request` events carry, but not on the trimmed one attached to
+// `pull_request_review*` events. Optional so a payload without them still
+// parses — a missing size is a field we omit, never a rejected delivery.
+export const diffStatFields = {
+	additions: z.number().optional(),
+	deletions: z.number().optional(),
+	changed_files: z.number().optional(),
+};
+
 export const openSchema = z.object({
 	action: z.literal("opened"),
 	repository: z.object({
@@ -21,6 +31,7 @@ export const openSchema = z.object({
 		user: userSchema,
 		body: z.string().optional().nullable(),
 		draft: z.boolean().optional().default(false),
+		...diffStatFields,
 	}),
 });
 
@@ -41,6 +52,7 @@ export const closedSchema = z.object({
 		merge_commit_sha: z.string().nullable(),
 		body: z.string().nullable(),
 		merged_by: userSchema.nullable(),
+		...diffStatFields,
 	}),
 });
 
@@ -65,6 +77,7 @@ export const convertedToDraftSchema = z.object({
 		user: userSchema,
 		body: z.string().optional().nullable(),
 		draft: z.literal(true),
+		...diffStatFields,
 	}),
 });
 
@@ -81,6 +94,7 @@ export const readyForReviewSchema = z.object({
 		user: userSchema,
 		body: z.string().optional().nullable(),
 		draft: z.literal(false),
+		...diffStatFields,
 	}),
 });
 
