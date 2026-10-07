@@ -18,6 +18,14 @@ export const diffStatFields = {
 	changed_files: z.number().optional(),
 };
 
+// Where the PR points. Optional for the same reason as `diffStatFields`: a
+// payload without them loses the merge-status field, not the notification.
+const branchRefSchema = z.object({ ref: z.string(), sha: z.string() });
+export const branchFields = {
+	head: branchRefSchema.optional(),
+	base: branchRefSchema.optional(),
+};
+
 export const openSchema = z.object({
 	action: z.literal("opened"),
 	repository: z.object({
@@ -32,6 +40,7 @@ export const openSchema = z.object({
 		body: z.string().optional().nullable(),
 		draft: z.boolean().optional().default(false),
 		...diffStatFields,
+		...branchFields,
 	}),
 });
 
@@ -78,6 +87,7 @@ export const convertedToDraftSchema = z.object({
 		body: z.string().optional().nullable(),
 		draft: z.literal(true),
 		...diffStatFields,
+		...branchFields,
 	}),
 });
 
@@ -95,6 +105,7 @@ export const readyForReviewSchema = z.object({
 		body: z.string().optional().nullable(),
 		draft: z.literal(false),
 		...diffStatFields,
+		...branchFields,
 	}),
 });
 

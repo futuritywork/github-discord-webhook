@@ -8,9 +8,21 @@ import {
 } from "../lib/adapters";
 import { colors } from "../lib/colors";
 import { diffStatField, diffStatSuffix } from "../lib/diffStat";
-import { type DiscordEmbed, sendDiscordEmbed } from "../lib/discord";
+import {
+	type DiscordEmbed,
+	editDiscordEmbed,
+	sendDiscordEmbed,
+} from "../lib/discord";
+import { env } from "../lib/env";
 import { filterBody } from "../lib/filterBody";
 import { logger } from "../lib/logger";
+import {
+	fetchMergeStatus,
+	mergeStatusRef,
+	type PrRef,
+	pendingMergeStatusField,
+	withMergeStatus,
+} from "../lib/mergeStatus";
 import { verifyGitHubSignature } from "../middleware/github-signature";
 import {
 	type GithubWebhookPayload,
@@ -48,13 +60,52 @@ type DiscordMessageParts = {
 	content: string;
 	username: string;
 	avatarUrl: string;
+	// Set when the embed carries a pending "Merge status" field that should be
+	// filled in by editing the message once GitHub answers.
+	mergeStatus?: PrRef;
 };
+
+// Merge status for an open PR: the PR ref plus the placeholder field to show
+// until the result arrives. Empty when the check can't run.
+function mergeStatusFor(
+	repoFullName: string,
+	pr: Parameters<typeof mergeStatusRef>[2],
+): { ref?: PrRef; fields: NonNullable<DiscordEmbed["fields"]> } {
+	const ref = mergeStatusRef(env.GITHUB_TOKEN, repoFullName, pr);
+	return ref
+		? { ref, fields: [pendingMergeStatusField(ref.baseRef)] }
+		: { fields: [] };
+}
+
+// Fill in the placeholder. Runs after the webhook has been answered, so GitHub
+// never waits on its own mergeability job.
+async function resolveMergeStatus(
+	webhookUrl: string,
+	messageId: string,
+	embed: DiscordEmbed,
+	ref: PrRef,
+	token: string,
+): Promise<void> {
+	const status = await fetchMergeStatus(ref, { token });
+	const result = await editDiscordEmbed(
+		webhookUrl,
+		messageId,
+		withMergeStatus(embed, status),
+	);
+	if (!result.ok) {
+		logger.error(
+			{ discordStatus: result.status, repo: ref.repoFullName, pr: ref.number },
+			"Discord rejected the merge-status edit",
+		);
+	}
+}
 
 // Callback for "opened" action
 function handleOpened(payload: OpenPayload): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
 	const isDraft = pr.draft ?? false;
+	const merge = mergeStatusFor(repoFullName, pr);
 
 	const { text, images } = pr?.body
 		? filterBody(pr.body)
@@ -80,6 +131,7 @@ function handleOpened(payload: OpenPayload): DiscordMessageParts {
 				inline: true,
 			},
 			...diffStatField(pr),
+			...merge.fields,
 		],
 	};
 
@@ -88,6 +140,7 @@ function handleOpened(payload: OpenPayload): DiscordMessageParts {
 		content: `${pr.user.login} opened ${isDraft ? "draft " : ""}PR #${pr.number} in ${repoFullName}: "${pr.title}"${diffStatSuffix(pr)}`,
 		username: `${repoFullName} · PR #${pr.number}`,
 		avatarUrl: pr.user.avatar_url,
+		mergeStatus: merge.ref,
 	};
 }
 
@@ -158,6 +211,7 @@ function handleConvertedToDraft(
 ): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
+	const merge = mergeStatusFor(repoFullName, pr);
 
 	const { text, images } = pr?.body
 		? filterBody(pr.body)
@@ -183,6 +237,7 @@ function handleConvertedToDraft(
 				inline: true,
 			},
 			...diffStatField(pr),
+			...merge.fields,
 		],
 	};
 
@@ -191,6 +246,7 @@ function handleConvertedToDraft(
 		content: `${pr.user.login} converted PR #${pr.number} back to draft: "${pr.title}"${diffStatSuffix(pr)}`,
 		username: `${repoFullName} · PR #${pr.number}`,
 		avatarUrl: pr.user.avatar_url,
+		mergeStatus: merge.ref,
 	};
 }
 
@@ -200,6 +256,7 @@ function handleReadyForReview(
 ): DiscordMessageParts {
 	const pr = payload.pull_request;
 	const repoFullName = payload.repository?.full_name ?? "Unknown";
+	const merge = mergeStatusFor(repoFullName, pr);
 
 	const { text, images } = pr?.body
 		? filterBody(pr.body)
@@ -225,6 +282,7 @@ function handleReadyForReview(
 				inline: true,
 			},
 			...diffStatField(pr),
+			...merge.fields,
 		],
 	};
 
@@ -233,6 +291,7 @@ function handleReadyForReview(
 		content: `${pr.user.login} marked PR #${pr.number} ready for review: "${pr.title}"${diffStatSuffix(pr)}`,
 		username: `${repoFullName} · PR #${pr.number}`,
 		avatarUrl: pr.user.avatar_url,
+		mergeStatus: merge.ref,
 	};
 }
 
@@ -629,6 +688,7 @@ githubWebhookApp.post("/github/:id", async (c) => {
 		content: finalContent,
 		username: messageParts.username,
 		avatarUrl: messageParts.avatarUrl,
+		wait: !!messageParts.mergeStatus,
 	});
 
 	if (!result.ok) {
@@ -647,6 +707,31 @@ githubWebhookApp.post("/github/:id", async (c) => {
 			{ error: "Failed to send Discord notification", status: result.status },
 			502,
 		);
+	}
+
+	const mergeRef = messageParts.mergeStatus;
+	if (mergeRef && env.GITHUB_TOKEN) {
+		if (result.messageId) {
+			// Deliberately not awaited: polling GitHub's mergeability can take
+			// longer than GitHub's 10s webhook timeout.
+			void resolveMergeStatus(
+				webhookUrl,
+				result.messageId,
+				messageParts.embed,
+				mergeRef,
+				env.GITHUB_TOKEN,
+			).catch((err) => {
+				logger.error(
+					{ err, repo, pr: mergeRef.number },
+					"Failed to resolve merge status",
+				);
+			});
+		} else {
+			logger.warn(
+				{ repo, pr: mergeRef.number },
+				"Discord returned no message id; merge status stays pending",
+			);
+		}
 	}
 
 	return c.json({

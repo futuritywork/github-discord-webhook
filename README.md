@@ -49,6 +49,7 @@ bun run start
 | `NODE_ENV`              | ❌       | `development` | Environment mode                                              |
 | `REGISTRATION`          | ❌       | `open`        | Registration mode: `open`, `closed`, or `invite_only`         |
 | `RAILWAY_PUBLIC_DOMAIN` | ❌       | -             | Public domain for generated webhook URLs (Railway deployment) |
+| `GITHUB_TOKEN`          | ❌       | -             | Read access to watched repos; enables the PR "Merge status" field (conflicts, ahead/behind) |
 
 ### Example `.env`
 

@@ -8,7 +8,8 @@
 		"dev": "bun run build:frontend && bun run index.ts --hot",
 		"start": "bun run build:frontend && bun run index.ts",
 		"lint": "biome check . --write",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsgo --noEmit",
+		"test": "bun test"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.10",
