@@ -20,6 +20,9 @@ export const env = createEnv({
 			.enum(["fatal", "error", "warn", "info", "debug", "trace"])
 			.default("info"),
 		RAILWAY_PUBLIC_DOMAIN: z.string().optional(),
+		// Read access to the watched repos' pull requests and contents. Enables
+		// the "Merge status" field (conflicts, ahead/behind); omitted without it.
+		GITHUB_TOKEN: z.string().optional(),
 	},
 	runtimeEnv: process.env,
 	emptyStringAsUndefined: true,
